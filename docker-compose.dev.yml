@@ -2,9 +2,11 @@ version: "3.8"
 
 services:
   claudepulse:
-    # Pull pre-built image from GitHub Container Registry
-    image: ghcr.io/substance0/claudepulse:latest
-    container_name: claudepulse
+    # Local development: builds from Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claudepulse-dev
     environment:
       # Timezone configuration (optional, for better log readability)
       # Set to your local timezone so log timestamps match your local time
@@ -37,7 +39,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    restart: unless-stopped
 
 volumes:
   claudepulse-data:

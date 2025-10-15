@@ -1,19 +1,22 @@
-# ClaudePulse - Automated Claude Session Renewal Container
-# Node.js application with OAuth authentication and Claude CLI integration
+# ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value
+# Node.js application with OAuth authentication and Claude Agent SDK
 
 FROM node:20-alpine
 
-# Install runtime dependencies including Claude CLI
+# Build arguments for version information
+ARG VERSION=unknown
+ARG BUILD_DATE=unknown
+ARG VCS_REF=unknown
+
+# Install runtime dependencies including Claude CLI (required by SDK)
 RUN apk add --no-cache \
-    bash \
-    curl \
     tini \
     && npm install -g @anthropic-ai/claude-code \
     && claude --version
 
 # Create app directory and non-root user
-RUN addgroup -g 1001 -S claudeapp && \
-    adduser -S -D -u 1001 -s /bin/bash -G claudeapp claudeapp
+RUN addgroup -g 1001 -S claudepulse && \
+    adduser -S -D -u 1001 -G claudepulse claudepulse
 
 # Set working directory
 WORKDIR /app
@@ -29,15 +32,16 @@ RUN npm ci --only=production && \
 COPY src/ ./src/
 
 # Set proper ownership and permissions
-RUN chown -R claudeapp:claudeapp /app && \
-    chmod +x src/index.js
+RUN chown -R claudepulse:claudepulse /app && \
+    chmod +x src/index.js && \
+    chmod +x src/scripts/oauth-verify.js
 
 # Switch to non-root user
-USER claudeapp
+USER claudepulse
 
 # Create .claude directory for credentials with proper permissions
-RUN mkdir -p /home/claudeapp/.claude && \
-    chmod 700 /home/claudeapp/.claude
+RUN mkdir -p /home/claudepulse/.claude && \
+    chmod 700 /home/claudepulse/.claude
 
 # Environment variables with defaults
 ENV NODE_ENV=production \
@@ -47,11 +51,12 @@ ENV NODE_ENV=production \
     MAX_BACKOFF_MINUTES=30 \
     LOG_LEVEL=INFO \
     LOG_FORMAT=inline \
-    DRY_RUN=false
+    DRY_RUN=false \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 
-# Health check that verifies both Node.js app and Claude CLI
+# Health check that verifies Node.js app and Claude CLI availability (required by SDK)
 HEALTHCHECK --interval=5m --timeout=30s --start-period=30s --retries=3 \
-    CMD node -e "console.log('Node.js OK')" && claude --version || exit 1
+    CMD node -e "console.log('Node.js OK')" && claude --version > /dev/null || exit 1
 
 # Explicit stop signal for graceful shutdown
 STOPSIGNAL SIGTERM
@@ -65,9 +70,14 @@ CMD ["node", "src/index.js"]
 
 # Labels for metadata
 LABEL maintainer="ClaudePulse Project" \
-      description="Automated Claude session management with intelligent pulse scheduling" \
-      version="1.0.0" \
+      description="Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value" \
+      version="${VERSION}" \
       org.opencontainers.image.title="ClaudePulse" \
-      org.opencontainers.image.description="Automated Claude session management container" \
-      org.opencontainers.image.version="1.0.0" \
-      org.opencontainers.image.source="https://github.com/claudepulse/claudepulse"
+      org.opencontainers.image.description="Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/substance0/claudepulse" \
+      org.opencontainers.image.url="https://github.com/substance0/claudepulse" \
+      org.opencontainers.image.documentation="https://github.com/substance0/claudepulse#readme" \
+      org.opencontainers.image.vendor="ClaudePulse Project"

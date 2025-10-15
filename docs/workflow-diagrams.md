@@ -2,120 +2,124 @@
 
 This document presents the functional workflows of the ClaudePulse application using Mermaid diagrams.
 
+## System Overview
+
+**Quick understanding:** ClaudePulse automatically maintains your Claude Pro/Max session by sending periodic pulse messages.
+
+```mermaid
+graph LR
+    Start([Start]) --> Auth[Authenticate<br/>Claude CLI OAuth]
+    Auth --> Schedule[Calculate Next Pulse<br/>Strategy-based scheduling]
+    Schedule --> Wait[Wait Until Time]
+    Wait --> Send[Send Pulse Message]
+    Send --> Parse{Parse Response}
+    Parse -->|Success| Schedule
+    Parse -->|Cycle Limit Detected| UpdateSchedule[Update Schedule<br/>from reset time]
+    Parse -->|Error| Retry[Retry with Backoff]
+    UpdateSchedule --> Schedule
+    Retry --> Send
+
+    style Start fill:#e1f5fe
+    style Auth fill:#fff3e0
+    style Schedule fill:#e8f5e9
+    style Wait fill:#f3e5f5
+    style Send fill:#fff9c4
+    style Parse fill:#e0f2f1
+    style UpdateSchedule fill:#ffe0b2
+    style Retry fill:#ffebee
+```
+
+**Key Points:**
+
+- **Adaptive Scheduling**: 1-hour discovery mode → 5-hour normal operation
+- **Cycle Limit Aware**: Automatically adjusts schedule when Claude reports "5-hour limit reached • resets 2pm"
+- **Resilient**: Exponential backoff, credential watching, state persistence
+
+See detailed workflows below ↓
+
 ## Table of Contents
 
-1. [Main Application Workflow](#1-main-application-workflow)
-2. [Scheduler Workflow](#2-scheduler-workflow)
-3. [Scheduling Strategy Selection](#3-scheduling-strategy-selection)
-4. [Rate Limit Handling Workflow](#4-rate-limit-handling-workflow)
-5. [Session Tracking Workflow](#5-session-tracking-workflow)
-6. [Error Handling and Recovery](#6-error-handling-and-recovery)
-7. [Configuration Loading and Validation](#7-configuration-loading-and-validation)
-8. [Docker Deployment Workflow](#8-docker-deployment-workflow)
-9. [Authentication Recovery and State Persistence](#9-authentication-recovery-and-state-persistence)
-10. [Master System Architecture](#master-system-architecture)
-11. [Component Interaction Overview](#component-interaction-overview)
-12. [Key Design Principles](#key-design-principles)
+- [ClaudePulse Application Workflow Diagrams](#claudepulse-application-workflow-diagrams)
+  - [System Overview](#system-overview)
+  - [Table of Contents](#table-of-contents)
+  - [1. Main Application Workflow](#1-main-application-workflow)
+  - [2. Scheduler Workflow](#2-scheduler-workflow)
+  - [3. Scheduling Strategy Selection](#3-scheduling-strategy-selection)
+    - [Strategy Priority Table](#strategy-priority-table)
+    - [First Run vs Subsequent Run Behavior](#first-run-vs-subsequent-run-behavior)
+  - [4. Cycle Limit Handling Workflow](#4-cycle-limit-handling-workflow)
+  - [5. Session Tracking Workflow](#5-session-tracking-workflow)
+  - [6. Error Handling and Recovery](#6-error-handling-and-recovery)
+  - [7. Configuration Loading and Validation](#7-configuration-loading-and-validation)
+  - [Master System Architecture](#master-system-architecture)
+  - [Component Interaction Overview](#component-interaction-overview)
+  - [Key Design Principles](#key-design-principles)
 
 ## 1. Main Application Workflow
 
+**Simplified view** - See [Error Handling and Recovery](#6-error-handling-and-recovery) for detailed error flows.
+
 ```mermaid
 graph TD
-    A["`**Application Start**
-    _Initializes ClaudePulse process_`"] --> B["`**Load Configuration**
-    _From env vars + defaults_`"]
+    A["`**Application Start**`"] --> B["`**Load & Validate Config**
+    _Environment variables + defaults_`"]
 
-    B --> C["`**Validate Configuration**
-    _Check required fields_`"]
-
-    C --> D["`**Create ClaudeScheduler**
+    B --> C["`**Create Scheduler**
     _Initialize automation engine_`"]
 
-    D --> E["`**Start Scheduler**
-    _Test auth + begin operation_`"]
+    C --> D["`**Start Scheduler**
+    _Test authentication_`"]
 
-    E --> F{"`**Start Successful?**
-    _Authentication check_`"}
+    D --> E{"`**Start Success?**`"}
 
-    F -->|"✗ Auth Failed"| G["`**Watch Credentials**
-    _Monitor ~/.claude/ for changes_`"]
+    E -->|"✗ Auth Failed"| F["`**Watch Credentials**
+    _Auto-recovery on file change_`"]
+    F --> G{"`**Credentials Updated?**`"}
+    G -->|"Yes"| D
+    G -->|"No"| F
 
-    F -->|"✗ Other Error"| H{"`**Keep Alive on Failure?**
-    _KEEP_ALIVE_ON_FAILURE setting_`"}
-
-    F -->|"✗ Network Error"| AA["`**Network Error Handler**
-    _Exponential backoff retry_`"]
-
-    F -->|"✗ Process Error"| BB["`**Process Error Handler**
-    _Log and attempt recovery_`"]
-
-    F -->|"✓ Success"| I["`**Scheduler Running**
-    _Ready for pulse cycle_`"]
-
-    G --> J["`**Wait for Credentials**
-    _Check every 2 seconds_`"]
-
-    J --> K{"`**Credentials Updated?**
-    _File modification time changed_`"}
-
-    K -->|"✓ Updated"| E
-    K -->|"No Change"| J
-
-    H -->|"Debug Mode"| L["`**Hold Process**
-    _Keep alive for debugging_`"]
-
-    H -->|"Exit"| M["`**Return Error**
+    E -->|"✗ Other Error"| H{"`**KEEP_PULSE_ON_FAILURE?**`"}
+    H -->|"Yes"| I["`**Hold Process**
+    _Debug mode_`"]
+    H -->|"No"| J["`**Exit**
     _Graceful failure_`"]
 
-    AA --> CC{"`**Network Retry Limit?**
-    _Max attempts reached_`"}
-    CC -->|"Continue"| DD["`**Exponential Backoff**
-    _Wait longer before retry_`"]
-    CC -->|"Give Up"| M
-    DD --> E
+    E -->|"✓ Success"| K{"`**DRY_RUN Mode?**`"}
 
-    BB --> EE{"`**Process Recoverable?**
-    _Error type analysis_`"}
-    EE -->|"Recoverable"| E
-    EE -->|"Fatal"| M
+    K -->|"Yes"| L["`**Exit Early**
+    _Config test complete_`"]
 
-    I --> N{"`**Dry Run Mode?**
-    _DRY_RUN environment variable_`"}
+    K -->|"No"| M["`**Setup Handlers**
+    _Shutdown & error handling_`"]
 
-    N -->|"Test Only"| O["`**Exit Early**
-    _Analysis complete_`"]
+    M --> N["`**Application Running**
+    _5-hour pulse automation active_`"]
 
-    N -->|"Production"| P["`**Setup Shutdown Handlers**
-    _SIGINT, SIGTERM handling_`"]
+    N --> O["`**Graceful Shutdown**
+    _On SIGINT/SIGTERM_`"]
 
-    P --> Q["`**Setup Error Handlers**
-    _Uncaught exceptions_`"]
+    %% Annotations
+    NOTE_AUTH["`**Authentication Recovery**
+    _• Monitors ~/.claude/ for credential changes
+    • Automatic retry when file updated
+    • Preserves lastScheduledTime across failures
+    • No manual intervention required_`"]
 
-    Q --> R["`**Application Running**
-    _Keepalive automation active_`"]
+    NOTE_ERROR["`**Error Handling**
+    _• Network errors: exponential backoff retry
+    • Process errors: smart recovery analysis
+    • Auth failures: credential watch mode
+    • All errors preserve scheduling state_`"]
 
-    R --> S["`**Graceful Shutdown**
-    _Clean resource cleanup_`"]
+    NOTE_ARCH["`**Architecture**
+    _• Single scheduler instance
+    • Event-driven with timers
+    • ~1 API call per 5-hour cycle
+    • Minimal memory footprint_`"]
 
-    %% Visual annotations
-    NOTE1["`Authentication Recovery
-    _Automatic retry on credential updates
-    No manual intervention required
-    Preserves lastScheduledTime across failures_`"]
-
-    NOTE2["`Performance Note
-    _Single scheduler instance handles
-    all 5-hour pulse cycles_`"]
-
-    NOTE3["`**Error Resilience**
-    _Network errors use exponential backoff
-    Process errors attempt smart recovery
-    Authentication failures trigger credential watch_`"]
-
-    G -.->|"Recovery process"| NOTE1
-    I -.->|"Architecture"| NOTE2
-    AA -.->|"Fault tolerance"| NOTE3
-    BB -.->|"Recovery strategy"| NOTE3
+    F -.->|"Recovery"| NOTE_AUTH
+    H -.->|"Errors"| NOTE_ERROR
+    N -.->|"Design"| NOTE_ARCH
 ```
 
 ## 2. Scheduler Workflow
@@ -150,10 +154,10 @@ graph TD
     H --> J["`**Update Last Success Time**
     _Record successful pulse_`"]
 
-    I --> K{"`**Rate Limited?**
+    I --> K{"`**Cycle Limit Reached?**
     _5-hour limit reached message_`"}
 
-    K -->|"Yes"| L["`**Parse Rate Limit Info**
+    K -->|"Yes"| L["`**Parse Cycle Limit Info**
     _Extract reset time_`"]
 
     K -->|"✗ Other Error"| M["`**Increment Failure Count**
@@ -179,7 +183,7 @@ graph TD
     %% Annotations
     NOTE3["`Performance Impact
     _Each cycle consumes ~1 API call
-    Rate limiting is expected behavior_`"]
+    Cycle limits are expected behavior_`"]
 
     NOTE4["`**Reliability Design**
     _Never stops trying to schedule
@@ -187,19 +191,135 @@ graph TD
 
     K -.->|"Expected behavior"| NOTE3
     Q -.->|"Fault tolerance"| NOTE4
+
+    %% Consistent styling
+    style A fill:#e1f5fe
+    style H fill:#e8f5e9
+    style J fill:#e8f5e9
+    style K fill:#f3e5f5
+    style L fill:#ffe0b2
+    style M fill:#ffebee
+    style P fill:#fff3e0
+    style Q fill:#ffebee
 ```
 
 ## 3. Scheduling Strategy Selection
 
+### Strategy Priority Table
+
+Strategies are evaluated in priority order. The first applicable strategy determines the next run time.
+
+| Priority | Strategy        | When Applicable                                     | Next Run Time                  | Example                              |
+| -------- | --------------- | --------------------------------------------------- | ------------------------------ | ------------------------------------ |
+| **1**    | Reset Signal    | Cycle limit message received                        | Reset time + 10sec             | "resets 2pm" → 14:00:10              |
+| **2**    | Scheduled Start | `SCHEDULED_START_HOUR` set + no `lastScheduledTime` | `SCHEDULED_START_HOUR` + 10sec | `SCHEDULED_START_HOUR=14` → 14:00:10 |
+| **3**    | Active Cycle    | Active session window detected                      | Window end + 10sec             | Active session ends 19:00 → 19:00:10 |
+| **4**    | Cruise          | Has `lastScheduledTime` + cycle detected            | Last time + 5 hours            | Last: 09:00:10 → Next: 14:00         |
+| **5**    | Discovery       | Fallback (no other strategy applies)                | Next hour + 10sec              | Current: 13:45 → Next: 14:00:10      |
+
+**Key Points:**
+
+- **Reset Signal** (Priority 1) overrides all others when a cycle limit is detected
+- **Scheduled Start** (Priority 2) only applies to the **first pulse** when starting fresh
+- **Active Cycle** (Priority 3) detects mid-cycle container restarts and schedules at cycle expiry
+- **Cruise** (Priority 4) activates after cycle detection, maintains 5-hour intervals
+- **Discovery** (Priority 5) continues hourly pulses until cycle limit message received
+- All times are in container's local timezone (set via `TZ` environment variable)
+- All strategies include a 10-second buffer to ensure pulse happens after time boundary
+
+### First Run vs Subsequent Run Behavior
+
+Understanding the difference between first run and subsequent runs helps clarify strategy selection:
+
+```mermaid
+graph TB
+    subgraph FIRST ["First Run (No lastScheduledTime)"]
+        A1["`**Start ClaudePulse**
+        _Fresh installation_`"] --> B1{"`**SCHEDULED_START_HOUR set?**
+        _Environment variable_`"}
+
+        B1 -->|"✓ Yes"| C1["`**Scheduled Start Strategy**
+        _Align to configured hour_`"]
+        C1 --> D1["`**Schedule at SCHEDULED_START_HOUR + 10sec**
+        _Example: 14:00:10_`"]
+
+        B1 -->|"✗ No"| E1{"`**Active Cycle detected?**
+        _Active Claude session found_`"}
+
+        E1 -->|"✓ Yes"| F1["`**Active Cycle Strategy**
+        _Use detected window end_`"]
+        F1 --> G1["`**Schedule at Window End + 10sec**
+        _Example: 19:00:10_`"]
+
+        E1 -->|"✗ No"| H1["`**Discovery Strategy**
+        _Safe fallback_`"]
+        H1 --> I1["`**Schedule at Next Hour + 10sec**
+        _Example: 14:00:10_`"]
+
+        D1 --> J1["`**Execute Pulse**
+        _Send message to Claude_`"]
+        G1 --> J1
+        I1 --> J1
+
+        J1 --> K1["`**Record lastScheduledTime**
+        _Transition to Cruise (after cycle detected)_`"]
+
+        style A1 fill:#fff3e0
+        style C1 fill:#e8f5e9
+        style F1 fill:#e1f5fe
+        style H1 fill:#f3e5f5
+    end
+
+    subgraph SUBSEQUENT ["Subsequent Runs (Has lastScheduledTime)"]
+        A2["`**ClaudePulse Running**
+        _Normal operation_`"] --> B2{"`**Cycle limit detected?**
+        _'5-hour limit reached • resets 2pm'_`"}
+
+        B2 -->|"✓ Yes"| C2["`**Reset Signal Strategy**
+        _Highest priority override_`"]
+        C2 --> D2["`**Schedule at Reset Time + 10sec**
+        _Example: 14:00:10_`"]
+
+        B2 -->|"✗ No"| E2["`**Cruise Strategy**
+        _Most common case_`"]
+        E2 --> F2["`**Schedule at Last + 5 Hours**
+        _Example: 09:00:10 → 14:00:10_`"]
+
+        D2 --> G2["`**Execute Pulse**
+        _Consistent 5-hour intervals_`"]
+        F2 --> G2
+
+        G2 --> H2["`**Update lastScheduledTime**
+        _Maintain schedule state_`"]
+
+        H2 --> A2
+
+        style A2 fill:#e8f5e9
+        style C2 fill:#ffebee
+        style E2 fill:#e1f5fe
+    end
+
+    K1 -.->|"Becomes"| A2
+```
+
+**Key Differences:**
+
+| Aspect               | First Run                                  | Subsequent Runs                       |
+| -------------------- | ------------------------------------------ | ------------------------------------- |
+| **Primary Strategy** | Scheduled Start / Active Cycle / Discovery | Cruise (every 5 hours)                |
+| **Schedule State**   | No `lastScheduledTime` yet                 | Has `lastScheduledTime`               |
+| **Behavior**         | Tries to discover current cycle boundaries | Maintains consistent 5-hour intervals |
+| **Override**         | Reset Signal only                          | Reset Signal only                     |
+
 ```mermaid
 graph TD
     A["`**Schedule Request**
-    _Determine next pulse time_`"] --> B{"`**External Signal?**
-    _Rate limit reset signal_`"}
+    _Determine next pulse time_`"] --> B{"`**Reset Signal?**
+    _Cycle limit reset signal_`"}
 
-    B -->|"✓ Yes"| C["`**External Signal Strategy**
+    B -->|"✓ Yes"| C["`**Reset Signal Strategy**
     _Highest priority scheduling_`"]
-    C --> D["`**Align to Hour + 10m**
+    C --> D["`**Align to Hour + 10sec**
     _Schedule at reset time + buffer_`"]
     D --> E["`**Schedule Execution**
     _Timer set for calculated time_`"]
@@ -207,75 +327,92 @@ graph TD
     B -->|"✗ No"| F{"`**Has Last Scheduled Time?**
     _Previous pulse exists_`"}
 
-    F -->|"✓ Yes"| G["`**Fixed Cadence Strategy**
+    F -->|"✓ Yes"| G["`**Cruise Strategy**
     _Maintain 5-hour intervals_`"]
     G --> H["`**Last Time + 5 Hours**
     _Consistent scheduling pattern_`"]
     H --> E
 
-    F -->|"✗ No"| I{"`**Reset Hour Configured?**
-    _RESET_HOUR environment variable_`"}
+    F -->|"✗ No"| I{"`**Initial Pulse Hour Configured?**
+    _SCHEDULED_START_HOUR environment variable_`"}
 
-    I -->|"✓ Yes"| J["`Reset Hour Anchor Strategy
-    _Align to business hours_`"]
-    J --> K["`**Next Reset Hour + 10m**
-    _e.g., 9:10am, 2:10pm, 7:10pm_`"]
+    I -->|"✓ Yes"| J["`Scheduled Start Strategy
+    _First pulse only - align to configured hour_`"]
+    J --> K["`**Next SCHEDULED_START_HOUR + 10sec**
+    _e.g., SCHEDULED_START_HOUR=14 → 14:00:10 local time_`"]
     K --> E
 
-    I -->|"✗ No"| L["`**Session Expiry Strategy**
+    I -->|"✗ No"| L["`**Active Cycle Strategy**
     _Use Claude session data_`"]
     L --> M["`**Update Session Tracking**
     _Scan JSONL files for activity_`"]
-    M --> N{"`**Session Expiry Available?**
+    M --> N{"`**Active Cycle Available?**
     _Active 5-hour window found_`"}
 
-    N -->|"✓ Yes"| O["`**Session Expiry + 10m**
+    N -->|"✓ Yes"| O["`**Cycle Expiry + 10sec**
     _Schedule after current window_`"]
-    N -->|"✗ No"| P["`Initial Align Strategy
+    N -->|"✗ No"| P["`Discovery Strategy
     _First-run fallback_`"]
     O --> E
-    P --> Q["`**Next Hour + 10m**
+    P --> Q["`**Next Hour + 10sec**
     _Safe default scheduling_`"]
     Q --> E
 
     %% Strategy annotations
-    NOTE_EXT["`**External Signal Priority**
+    NOTE_EXT["`**Reset Signal Priority**
     _Overrides all other strategies
     Uses precise reset time from Claude
-    Always includes 10-minute buffer_`"]
+    Always includes 10-second buffer_`"]
 
-    NOTE_RESET["`RESET_HOUR Configuration
-    _Examples: RESET_HOUR=9,14,19
-    Creates 9am, 2pm, 7pm anchors
-    Finds next anchor after current time
-    Ideal for business hour alignment_`"]
+    NOTE_RESET["`SCHEDULED_START_HOUR Configuration
+    _Example: SCHEDULED_START_HOUR=14 → first pulse at 14:00:10
+    Only applies to first pulse when no schedule exists
+    Subsequent pulses use Cruise (every 5h after cycle detected)
+    Use when you know the next cycle start time_`"]
 
-    NOTE_CADENCE["`**Fixed Cadence Behavior**
+    NOTE_CADENCE["`**Cruise Behavior**
     _Preserves exact 5-hour intervals
     Most predictable scheduling pattern
-    Used once initial schedule established_`"]
+    Activates after cycle detection_`"]
 
     C -.->|"Highest priority"| NOTE_EXT
     J -.->|"Configuration"| NOTE_RESET
     G -.->|"Predictable timing"| NOTE_CADENCE
+
+    %% Consistent styling
+    style A fill:#e1f5fe
+    style C fill:#ffe0b2
+    style E fill:#e8f5e9
+    style G fill:#e8f5e9
+    style J fill:#fff3e0
+    style L fill:#e1f5fe
 ```
 
-## 4. Rate Limit Handling Workflow
+## 4. Cycle Limit Handling Workflow
 
 ```mermaid
 %% This is a comment explaining the flow
 graph TD
     A[Claude CLI Call Failed] --> B[Parse Error Message]
     B --> C{Auth Error?}
-    C -->|Yes| D[Return No Rate Limit]
-    C -->|No| E[Check Claude Rate Limit Format]
+    C -->|Yes| D[Return No Cycle Limit]
+    C -->|No| E[Check Claude Cycle Limit Format]
     E --> F{"#quot;5-hour limit reached ∙ resets Xpm#quot;?"}
     F -->|Yes| G[Parse Reset Hour]
-    F -->|No| H[Return No Rate Limit]
+    F -->|No| H[Return No Cycle Limit]
     G --> I[Convert to 24-hour Format]
     I --> J[Calculate Reset Time]
     J --> K[Schedule at Reset Time + Buffer]
     H --> L[Handle as Normal Error]
+
+    %% Consistent styling
+    style A fill:#ffebee
+    style C fill:#f3e5f5
+    style D fill:#e8f5e9
+    style F fill:#f3e5f5
+    style G fill:#e1f5fe
+    style K fill:#e8f5e9
+    style L fill:#ffebee
 ```
 
 ## 5. Session Tracking Workflow
@@ -342,6 +479,13 @@ graph TD
 
     G -.->|"Format detection"| NOTE5
     M -.->|"Assumptions"| NOTE6
+
+    %% Consistent styling
+    style A fill:#e1f5fe
+    style D fill:#f3e5f5
+    style J fill:#f3e5f5
+    style K fill:#e8f5e9
+    style N fill:#e8f5e9
 ```
 
 ## 6. Error Handling and Recovery
@@ -350,7 +494,7 @@ graph TD
 graph TD
     A[Error Detected] --> B{Error Type}
     B -->|Authentication| C[Mark Auth Failure]
-    B -->|Rate Limit| D[Parse Rate Limit Info]
+    B -->|Cycle Limit| D[Parse Cycle Limit Info]
     B -->|Network| E[Network Error Handler]
     B -->|Process| F[Process Error Handler]
 
@@ -374,6 +518,19 @@ graph TD
     F --> S[Log Fatal Error]
     S --> T[Graceful Shutdown]
     T --> U[Cleanup Resources]
+
+    %% Consistent styling
+    style A fill:#ffebee
+    style B fill:#f3e5f5
+    style C fill:#ffebee
+    style D fill:#ffe0b2
+    style E fill:#fff3e0
+    style J fill:#f3e5f5
+    style K fill:#e8f5e9
+    style L fill:#e8f5e9
+    style Q fill:#f3e5f5
+    style R fill:#ffebee
+    style S fill:#ffebee
 ```
 
 ## 7. Configuration Loading and Validation
@@ -390,30 +547,14 @@ graph TD
     H --> I[Log Configuration Summary]
     I --> J[Return Valid Config]
     G --> K[Application Termination]
-```
 
-## 8. Docker Deployment Workflow
-
-```mermaid
-graph TD
-    A[Docker Build] --> B[Copy Application Files]
-    B --> C[Install Dependencies]
-    C --> D[Set Working Directory]
-    D --> E[Configure Non-root User]
-    E --> F[Set Entry Point]
-    F --> G[Build Complete]
-
-    G --> H[Container Start]
-    H --> I[Mount Credentials Volume]
-    I --> J[Mount Session Data Volume]
-    J --> K[Start ClaudePulse Application]
-    K --> L[Application Running in Container]
-    L --> M[Monitor Container Health]
-    M --> N{Container Healthy?}
-    N -->|Yes| O[Continue Operation]
-    N -->|No| P[Container Restart]
-    O --> M
-    P --> H
+    %% Consistent styling
+    style A fill:#e1f5fe
+    style F fill:#f3e5f5
+    style G fill:#ffebee
+    style H fill:#e8f5e9
+    style J fill:#e8f5e9
+    style K fill:#ffebee
 ```
 
 ## Master System Architecture
@@ -455,7 +596,7 @@ graph TB
     subgraph EXEC ["**Execution Layer**"]
         J["`**Keepalive Executor**
         _Send ping messages_`"]
-        K["`**Rate Limit Handler**
+        K["`**Cycle Limit Handler**
         _Parse Claude responses_`"]
         L["`**Failure Recovery**
         _Exponential backoff_`"]
@@ -527,14 +668,14 @@ graph TB
     subgraph "Core Components"
         C --> D[Claude Client]
         C --> E[Session Tracker]
-        D --> F[Rate Limit Parser]
+        D --> F[Cycle Limit Parser]
         E --> G[Cycle Detection]
         E --> H[Timezone Handler]
     end
 
     subgraph "Utilities"
         I[Logger] --> J[Time Formatter]
-        F --> K[Rate Limit Strategies]
+        F --> K[Cycle Limit Strategies]
         C --> L[Scheduling Strategies]
     end
 
@@ -549,82 +690,9 @@ graph TB
     I -.->|Used by| E
 ```
 
-## 9. Authentication Recovery and State Persistence
-
-```mermaid
-graph TD
-    A["`**Scheduler Running**
-    _Normal operation state_`"] --> B["`**Execute Keepalive**
-    _Send ping to Claude CLI_`"]
-
-    B --> C{"`**Authentication Success?**
-    _CLI response analysis_`"}
-
-    C -->|"✓ Success"| D["`**Update Last Success Time**
-    _Record successful pulse_`"]
-
-    C -->|"✗ Auth Failed"| E["`**Preserve Schedule State**
-    _Keep lastScheduledTime intact_`"]
-
-    D --> F["`**Schedule Next Cycle**
-    _Use Fixed Cadence Strategy_`"]
-
-    E --> G["`**Start Credentials Watcher**
-    _Monitor ~/.claude/ for changes_`"]
-
-    G --> H["`**Wait for Credential Update**
-    _Check file modification time_`"]
-
-    H --> I{"`**Credentials Changed?**
-    _File timestamp comparison_`"}
-
-    I -->|"✗ No Change"| H
-    I -->|"✓ Updated"| J["`**Retry Authentication**
-    _Test with new credentials_`"]
-
-    J --> K{"`**Auth Recovery Success?**
-    _New credentials valid_`"}
-
-    K -->|"✗ Still Failed"| G
-    K -->|"✓ Success"| L["`**Resume with Preserved Schedule**
-    _Use existing lastScheduledTime_`"]
-
-    L --> M["`**Calculate Next Run Time**
-    _lastScheduledTime + 5 hours_`"]
-
-    M --> N["`**Continue Normal Operation**
-    _Seamless recovery complete_`"]
-
-    F --> A
-    N --> A
-
-    %% State persistence annotations
-    NOTE_PERSIST["`State Persistence Strategy
-    _lastScheduledTime preserved during auth failures
-    Prevents schedule drift after recovery
-    Maintains consistent 5-hour intervals
-    No manual intervention required_`"]
-
-    NOTE_RECOVERY["`**Recovery Characteristics**
-    _Automatic credential monitoring
-    Instantaneous recovery on file change
-    Zero schedule disruption
-    Graceful failure handling_`"]
-
-    NOTE_TIMING["`**Timing Behavior**
-    _Auth failure at T+0: pulse skipped
-    Credential update at T+30min: auth recovered
-    Next schedule: T+5hours (original plan)
-    No catchup attempts or schedule drift_`"]
-
-    E -.->|"State management"| NOTE_PERSIST
-    G -.->|"Recovery process"| NOTE_RECOVERY
-    M -.->|"Schedule integrity"| NOTE_TIMING
-```
-
 ## Key Design Principles
 
-1. **Strategy Pattern**: Both rate limit parsing and scheduling use strategy patterns for flexibility and maintainability
+1. **Strategy Pattern**: Both cycle limit parsing and scheduling use strategy patterns for flexibility and maintainability
 2. **Error Recovery**: Comprehensive error handling with automatic recovery mechanisms
 3. **Session Awareness**: Smart scheduling based on actual Claude session state
 4. **State Persistence**: lastScheduledTime preserved across authentication failures to prevent schedule drift

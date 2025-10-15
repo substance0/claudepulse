@@ -1,12 +1,9 @@
 {
   "name": "claudepulse",
-  "version": "1.0.0",
-  "description": "Automated Claude session management with intelligent pulse scheduling for maximum Pro/Max subscription value",
+  "version": "1.1.3",
+  "description": "Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value",
   "type": "module",
   "main": "src/index.js",
-  "bin": {
-    "claudepulse": "src/index.js"
-  },
   "files": [
     "src/",
     "Dockerfile",
@@ -22,21 +19,27 @@
     "docker:build": "docker build -t claudepulse . --load",
     "docker:build:fresh": "docker build --no-cache -t claudepulse . --load",
     "docker:run": "docker run -dt --name claudepulse claudepulse",
+    "docker:run:with-volume": "docker run -dt --name claudepulse -e TZ=$(readlink /etc/localtime | sed 's#.*/zoneinfo/##') -v ${HOME}/.claude:/home/claudepulse/.claude claudepulse",
+    "docker:run:mock-session-limit": "docker run -dt -e MOCK_CLAUDE_SESSION_LIMIT_MESSAGE=\"5-hour limit reached ∙ resets 2pm\" --name claudepulse claudepulse",
+    "docker:run:mock-session-limit:with-volume": "docker run -dt -e TZ=$(readlink /etc/localtime | sed 's#.*/zoneinfo/##') -e MOCK_CLAUDE_SESSION_LIMIT_MESSAGE=\"5-hour limit reached ∙ resets 2pm\" --name claudepulse -v ${HOME}/.claude:/home/claudepulse/.claude claudepulse",
+    "docker:run:mock-ping-success": "docker run -dt -e MOCK_CLAUDE_PING_SUCCESS_MESSAGE='{\"result\": \"Pinging...\"}' --name claudepulse claudepulse",
+    "docker:run:mock-ping-success:with-volume": "docker run -dt -e TZ=$(readlink /etc/localtime | sed 's#.*/zoneinfo/##') -e MOCK_CLAUDE_PING_SUCCESS_MESSAGE='{\"result\": \"Pinging...\"}' --name claudepulse -v ${HOME}/.claude:/home/claudepulse/.claude claudepulse",
     "docker:run:hold": "docker run -dt --name claudepulse -e KEEP_PULSE_ON_FAILURE=true claudepulse",
     "docker:run:interactive": "docker run -it --name claudepulse claudepulse",
     "docker:run:restart": "docker run -dt --name claudepulse --restart unless-stopped claudepulse",
     "docker:bash": "docker exec -it claudepulse /bin/sh",
-    "docker:debug": "docker run -dt --name claudepulse --restart unless-stopped -e DRY_RUN=true -e LOG_LEVEL=DEBUG claudepulse",
+    "docker:oauth-verify": "docker exec -it claudepulse node src/scripts/oauth-verify.js",
     "docker:start": "docker start claudepulse",
     "docker:stop": "docker stop claudepulse",
     "docker:rm": "docker rm claudepulse",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker logs -f claudepulse",
+    "docker:logs": "docker logs claudepulse",
     "docker:restart": "npm run docker:down && npm run docker:up",
     "docker:clean": "docker system prune -f && docker image prune -f",
     "logs": "mkdir -p logs && tail -f logs/claudepulse.log",
-    "force-pulse": "node -e \"import('./src/automation/scheduler.js').then(({ClaudeScheduler}) => ClaudeScheduler.create().then(s => s.forcePulse().then(() => process.exit(0))))\""
+    "oauth-verify": "node src/scripts/oauth-verify.js",
+    "oauth-status": "node src/scripts/oauth-status.js"
   },
   "keywords": [
     "claude",
@@ -78,18 +81,17 @@
     "x64",
     "arm64"
   ],
-  "dependencies": {},
   "devDependencies": {
-    "nodemon": "^3.0.0",
-    "semantic-release": "^24.0.0",
-    "@semantic-release/commit-analyzer": "^13.0.0",
-    "@semantic-release/release-notes-generator": "^14.0.0",
     "@semantic-release/changelog": "^6.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/git": "^10.0.0",
     "@semantic-release/github": "^11.0.0",
-    "@semantic-release/git": "^10.0.0"
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.0.0",
+    "conventional-changelog-conventionalcommits": "^9.1.0",
+    "nodemon": "^3.0.0",
+    "semantic-release": "^24.0.0"
   },
-  "peerDependencies": {},
-  "optionalDependencies": {},
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/claudepulse"
@@ -98,5 +100,8 @@
     "logLevel": "INFO",
     "defaultInterval": "5",
     "maxRetries": "3"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.1"
   }
 }

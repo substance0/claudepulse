@@ -1,5 +1,5 @@
 > [!NOTE]
-> **Educational Project Disclaimer:** This is a personal project created for educational purposes and personal use, developed with AI generation tools. There is no clear intention for ongoing maintenance, support, or structured roadmapping. Use at your own discretion.
+> This is a personal project I’m using to learn and experiment (with some AI help). It’s not really maintained, doesn’t have a roadmap, and comes with no guarantees—use at your own risk.
 
 <div align="center">
 
@@ -12,32 +12,28 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/substance0/claudepulse/releases)
+[![Version](https://img.shields.io/github/v/release/substance0/claudepulse)](https://github.com/substance0/claudepulse/releases)
 
-[Quick Start](#quick-start-with-docker) • [Features](#features) • [Documentation](docs/) • [Support](#support)
+[Installation](#installation) • [Features](#features) • [Configuration](#configuration) • [Support](#support) • [Changelog](#changelog) • [Contributing](#contributing) • [Licence](#licence)
 
 </div>
-
-## Acknowledgments
-
-A special thanks to **[Maciek-roboblog](https://github.com/Maciek-roboblog)** for his work on **[claude-code-usage-monitor](https://github.com/Maciek-roboblog/claude-code-usage-monitor)** that helped implement the 5-hour cycle detection logic. Clever tool here!
 
 ## At a Glance
 
 Here's the thing: Claude Code's 5-hour windows don't reset automatically when they expire. Each new window only starts when you send your first prompt after the reset time. The next limit is then computed based on your first prompt's hour (rounded down) + 5 hours. Miss that window, and you could lose precious coding hours when you finally sit down to work.
 
 > [!WARNING]
-> The "5-hour limit" can trigger before 5 actual hours due to token limits or other Claude-specific thresholds.
+> The "5-hour limit" can trigger before 5 actual hours due to token limits or other Claude-specific thresholds. See more details [on Claude's website](https://support.claude.com/en/articles/8324991-about-claude-s-pro-plan-usage).
 
 ### Real-World Scenario
 
-| Time | Without ClaudePulse | With ClaudePulse |
-|------|---------------------|------------------|
-| **9:00 AM** | 🚀 Start coding, excited about your project | 🚀 Start coding, excited about your project |
-| **11:00 AM** | 😱 *"5-hour limit reached • resets 2pm"* | 😱 *"5-hour limit reached • resets 2pm"* |
-| **2:00 PM** | ⏰ Reset time arrives, but you're in meetings | ⏰ Reset time arrives, but you're in meetings |
-| **2:10 PM** | 💼 Still in meetings... | ✅ **ClaudePulse sends pulse automatically** |
-| **4:00 PM** | 😞 Ready to code, but window starts NOW<br>*(Lost 2 hours you paid for)* | 😎 Ready to code with **3h remaining**<br>*(Maximum subscription value)* |
+| Time         | Without ClaudePulse                                                      | With ClaudePulse                                                         |
+| ------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| **9:00 AM**  | 🚀 Start coding, excited about your project                              | 🚀 Start coding, excited about your project                              |
+| **11:00 AM** | 😱 _"5-hour limit reached • resets 2pm"_                                 | 😱 _"5-hour limit reached • resets 2pm"_                                 |
+| **2:00 PM**  | ⏰ Reset time arrives, but you're in meetings                            | ⏰ Reset time arrives, but you're in meetings                            |
+| **2:10 PM**  | 💼 Still in meetings...                                                  | ✅ **ClaudePulse sends pulse automatically**                             |
+| **4:00 PM**  | 😞 Ready to code, but window starts NOW<br>_(Lost 2 hours you paid for)_ | 😎 Ready to code with **3h remaining**<br>_(Maximum subscription value)_ |
 
 ## Installation
 
@@ -45,77 +41,154 @@ Here's the thing: Claude Code's 5-hour windows don't reset automatically when th
 <summary><strong>🐳 Docker Registry (Recommended)</strong></summary>
 
 ```bash
-# Pull and run from GitHub Container Registry with persistent volume
-docker run -d --name claudepulse \
-  -v claudepulse-data:/root/.claude \
-  ghcr.io/substance0/claudepulse:latest
-
-# Authenticate with Claude (one-time setup)
-docker exec -it claudepulse claude
-# In Claude CLI, run: /login
-# Follow authentication prompts, then exit
+docker run -d --name claudepulse -e TZ=America/New_York -v claudepulse-data:/home/claudepulse/.claude ghcr.io/substance0/claudepulse:latest
 ```
 
-Authentication persists between container restarts using the named volume.
+**💡 Timezone (Optional):** Set the `TZ` environment variable to your local timezone for better log readability. Replace `America/New_York` with your timezone (e.g., `Europe/London`, `Asia/Tokyo`). Default is `UTC`. [Find your timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+
+---
+
+**Authentication:**
+
+```bash
+# If you haven't pre-authenticated using 'claude /login' command:
+# ClaudePulse will display an OAuth authorization URL in the logs
+docker logs claudepulse
+
+# Open the OAuth URL in your browser to authenticate
+# Once authenticated, pass the verification code to complete authentication:
+docker exec -it claudepulse npm run oauth-verify <verification_code>
+
+# ClaudePulse will now automatically send pulse messages based on the detected scheduled strategy.
+```
+
+Authentication will persist between container restarts using the `claudepulse-data` Docker volume.
+
+**Stopping ClaudePulse:**
+
+```bash
+# Stop the container
+docker stop claudepulse
+
+# Remove the container (keeps volumes)
+docker rm claudepulse
+```
 
 </details>
 
 <details>
 <summary><strong>🐳 Docker Compose (Alternative)</strong></summary>
 
+**Download docker-compose.yml:**
+
 ```bash
-# Clone and build locally
+# Download the compose file
+curl -O https://raw.githubusercontent.com/substance0/claudepulse/main/docker-compose.yml
+
+# Or clone the entire repository
 git clone https://github.com/substance0/claudepulse.git
 cd claudepulse
-docker-compose up -d
-
-# Authenticate with Claude (one-time setup)
-docker exec -it claudepulse claude
-# In Claude CLI, run: /login
-# Follow authentication prompts, then exit
 ```
 
-Use Docker Compose for local builds with persistent volumes if you want your authentication to persist between restarts.
-
-</details>
-
-<details>
-<summary><strong>📦 NPM Global Install</strong></summary>
+**Start with Docker Compose:**
 
 ```bash
-npm install -g claudepulse
-claudepulse
+docker-compose up -d
 ```
 
-Requires Node.js 18+ and Claude CLI to be installed and authenticated separately.
+**💡 Timezone (Optional):** Edit `docker-compose.yml` to set the `TZ` environment variable to your local timezone for better log readability. Default is `UTC`.
+
+---
+
+**Authentication:**
+
+```bash
+# If you haven't pre-authenticated using 'claude /login' command:
+# ClaudePulse will display an OAuth authorization URL in the logs
+docker logs claudepulse
+
+# Open the OAuth URL in your browser to authenticate
+# Once authenticated, pass the verification code to complete authentication:
+docker exec -it claudepulse npm run oauth-verify <verification_code>
+
+# ClaudePulse will now automatically send pulse messages based on the detected scheduled strategy.
+```
+
+Authentication will persist between container restarts using the `claudepulse-data` Docker volume.
+
+**Stopping ClaudePulse:**
+
+```bash
+# Stop the Docker Compose stack
+docker-compose down
+
+# Or stop individual container
+docker stop claudepulse
+```
 
 </details>
 
 <details>
 <summary><strong>💻 Local Development</strong></summary>
 
+**Clone and Setup:**
+
 ```bash
 git clone https://github.com/substance0/claudepulse.git
 cd claudepulse
 npm install
+```
+
+**Run with Node.js:**
+
+```bash
 npm start
 ```
 
-Requires Claude CLI to be installed and authenticated separately.
+**Or build and run locally with Docker:**
+
+```bash
+# Build from Dockerfile
+docker-compose -f docker-compose.dev.yml up -d
+
+# View logs
+docker logs claudepulse-dev
+```
+
+**Requirements:** Node.js 18+ or Docker/Podman
+
+---
+
+**Authentication:**
+
+**💡 Recommended:** Pre-authenticate with Claude CLI (`claude /login`) before running ClaudePulse. This allows ClaudePulse to reuse existing credentials automatically.
+
+If not pre-authenticated, ClaudePulse will handle OAuth flow:
+
+```bash
+# ClaudePulse will display an OAuth authorization URL in the logs
+# Open the OAuth URL in your browser to authenticate
+
+# Once authenticated, pass the verification code to complete authentication:
+npm run oauth-verify <verification_code>
+
+# ClaudePulse will now automatically send pulse messages
+```
 
 </details>
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| **Smart 5-Hour Scheduling** | Automatically detects and aligns with usage windows |
-| **Claude CLI authentication auto-detection** | Ensures Claude CLI is authenticated before sending pulse messages to Claude servers |
-| **Session Tracking** | Monitors active sessions across projects |
-| **Intelligent Retry** | Exponential backoff with rate limit handling |
-| **Comprehensive Logging** | Structured JSON or human-friendly logs |
-| **Docker Ready** | One-command deployment with compose |
-| **Zero Dependencies** | Uses only Node.js built-ins for security |
+| Feature                            | Description                                                                                                                                                                                         |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Smart 5-Hour Cycle Detection**   | Automatically detects Claude Pro/Max 5-hour windows from session history and session limit messages                                                                                                 |
+| **Docker & Compose Ready**         | One-command deployment with volume persistence for authentication credentials                                                                                                                       |
+| **OAuth 2.0 with PKCE**            | Secure authentication flow with browser-based authorization and verification code exchange                                                                                                          |
+| **Credential Auto-Detection**      | Watches for credential changes during startup and automatically resumes when authentication completes                                                                                               |
+| **Intelligent Scheduling**         | Adapts to session limit signals, respects configured hours, tracks session history, or uses reliable defaults ([see strategies details](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
+| **Immediate Post-Auth Pulse**      | If the current 5-hour window cannot be detected, sends verification pulse immediately after OAuth completion to confirm connection and trigger new 5h window                                        |
+| **Intelligent Retry with Backoff** | Exponential backoff (configurable multiplier & max delay) with automatic session limit handling                                                                                                     |
+| **Minimal Dependencies**           | Only depends on official Anthropic Claude Agent SDK - no unnecessary bloat                                                                                                                          |
 
 ## Configuration
 
@@ -125,94 +198,37 @@ For comprehensive configuration documentation, see [ENVIRONMENT.md](ENVIRONMENT.
 
 ### Essential Settings
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PROMPT_TEXT` | `"ping"` | Pulse message sent to Claude |
-| `MAX_RETRIES` | `3` | Maximum retry attempts on failure |
-| `LOG_LEVEL` | `INFO` | Logging verbosity (ERROR, WARN, INFO, DEBUG) |
-| `DRY_RUN` | `false` | Simulate pulses without sending to Claude |
+| Variable      | Default  | Description                                  |
+| ------------- | -------- | -------------------------------------------- |
+| `PROMPT_TEXT` | `"ping"` | Pulse message sent to Claude                 |
+| `MAX_RETRIES` | `3`      | Maximum retry attempts on failure            |
+| `LOG_LEVEL`   | `INFO`   | Logging verbosity (ERROR, WARN, INFO, DEBUG) |
+| `DRY_RUN`     | `false`  | Simulate pulses without sending to Claude    |
 
 ### Advanced Settings
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RETRY_BACKOFF_MULTIPLIER` | `2` | Exponential backoff multiplier |
-| `MAX_BACKOFF_MINUTES` | `30` | Maximum retry delay in minutes |
-| `LOG_FORMAT` | `inline` | Log output format (`inline` or `json`) - independent of NODE_ENV |
-| `NODE_ENV` | `production` | Environment mode |
+| Variable                   | Default      | Description                          |
+| -------------------------- | ------------ | ------------------------------------ |
+| `RETRY_BACKOFF_MULTIPLIER` | `2`          | Exponential backoff multiplier       |
+| `MAX_BACKOFF_MINUTES`      | `30`         | Maximum retry delay in minutes       |
+| `NODE_ENV`                 | `production` | Environment mode                     |
+| `DISCORD_WEBHOOK_URL`      | `unset`      | Discord webhook URL for error alerts |
 
-## Docker Deployment
+### Discord Notifications (Optional)
 
-### Basic Container
+Get instant error alerts in Discord by setting up a webhook:
 
-```bash
-# Build image
-docker build -t claudepulse .
+1. **Create webhook**: Discord Server → Settings → Integrations → Webhooks → New Webhook
+2. **Copy webhook URL**
+3. **Add to environment**:
+   ```bash
+   docker run -d --name claudepulse \
+     -e DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN \
+     -v claudepulse-data:/home/claudepulse/.claude \
+     ghcr.io/substance0/claudepulse:latest
+   ```
 
-# Run container in background
-docker run -d --name claudepulse claudepulse
-
-# Exec into container to authenticate with Claude
-docker exec -it claudepulse claude
-
-# In Claude CLI, run /login slash command to authenticate with your Claude Pro/Max account
-/login
-
-# Follow authentication prompts, then exit Claude CLI
-exit
-
-# ClaudePulse will now automatically send pulse messages every 5 hours.
-
-# View logs
-docker logs -f claudepulse
-```
-
-### Docker Compose
-
-Use the provided [`docker-compose.yml`](docker-compose.yml) file for easy deployment:
-
-```bash
-# Start services
-docker-compose up -d
-```
-
-## Troubleshooting
-
-<details>
-<summary><strong>Authentication Failed</strong></summary>
-
-Ensure Claude CLI is installed and authenticated
-
-```bash
-# Authenticate interactively
-docker exec -it claudepulse claude
-# Then run: /login
-```
-
-</details>
-
-<details>
-<summary><strong>Docker Container Exits</strong></summary>
-
-Container may exit due to authentication or configuration issues
-
-```bash
-# View container logs
-docker logs claudepulse
-
-# Run in interactive mode for debugging
-docker run -it claudepulse
-```
-
-</details>
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on how to contribute to ClaudePulse.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Error notifications include error details, timestamp, and context. See [ENVIRONMENT.md](ENVIRONMENT.md#discord_webhook_url) for testing and advanced configuration.
 
 ## Support
 
@@ -224,10 +240,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.
 
-## Standards Compliance
+## Contributing
 
-This project follows established standards for versioning and change documentation:
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on how to contribute to ClaudePulse.
 
-- **[Keep a Changelog v1.1.0](https://keepachangelog.com/en/1.1.0/)** - Changelog format and structure
-- **[Semantic Versioning v2.0.0](https://semver.org/spec/v2.0.0.html)** - Version numbering scheme
+## License
 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

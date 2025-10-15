@@ -1,3 +1,53 @@
+# 1.0.0 (2025-10-15)
+
+
+### Features
+
+* ClaudePulse v1.0.0 - Production-ready automated Claude session manager ([5f67d29](https://github.com/substance0/claudepulse/commit/5f67d297adeb87378b8084498febd7e4b6ef03e4))
+
+
+### BREAKING CHANGES
+
+* Complete v1.0.0 release with comprehensive features
+
+This release includes the complete ClaudePulse system with:
+
+Core Features:
+- Automated Claude session management and cycling
+- Secure authentication with credential storage
+- Multi-strategy scheduling (CRON, immediate, smart-timing, off-peak)
+- Session tracking and analytics
+- Project-level log aggregation
+- Rate limit handling and retry logic
+- Desktop notifications for session events
+- Docker containerization with health checks
+
+Technical Implementation:
+- Modular architecture with clear separation of concerns
+- Comprehensive error handling and logging
+- State management and token refresh
+- SDK-based Claude integration
+- Configurable scheduling strategies
+- Session limit parsing and enforcement
+- Timezone-aware scheduling
+- Health monitoring and status reporting
+
+Infrastructure:
+- GitHub Actions CI/CD pipelines
+- Automated semantic versioning
+- Docker Hub publishing
+- Development and production Docker Compose setups
+- Comprehensive documentation
+
+Documentation:
+- Complete README with setup instructions
+- Contributing guidelines
+- Environment configuration guide
+- Workflow diagrams
+- Task Master integration
+
+This represents the stable v1.0.0 release ready for production use.
+
 ## [1.1.3](https://github.com/substance0/claudepulse/compare/v1.1.2...v1.1.3) (2025-10-14)
 
 

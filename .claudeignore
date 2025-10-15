@@ -1,0 +1,12 @@
+# Claude Code ignore file
+# Ignore Task Master command files to reduce context clutter
+.claude/commands/tm/
+
+# Ignore Claude Code Usage Monitor repository
+Claude-Code-Usage-Monitor/
+
+# Ignore node modules
+node_modules/
+
+# Ignore macOS files
+.DS_Store

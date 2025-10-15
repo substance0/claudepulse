@@ -1,0 +1,62 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Task Master files
+.taskmaster/
+CLAUDE.md
+
+# VS Code and IDE files
+.vscode/
+.claude/
+
+# Node.js dependencies and cache
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.pnpm-debug.log*
+
+# Documentation
+README.md
+*.md
+
+# Environment files
+.env
+.env.local
+.env.example
+
+# Development and test files
+test-*.mjs
+claude-poc.mjs
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (to avoid copying Dockerfile into itself)
+Dockerfile
+.dockerignore
+
+# MCP config
+.mcp.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Temporary folders
+tmp/
+temp/

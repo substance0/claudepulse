@@ -1,0 +1,125 @@
+# Product Requirements Document (PRD) – claudepulse
+
+## Overview
+The claudepulse project provides a lightweight Dockerized automation tool that leverages the Claude Code CLI to periodically send dummy prompts, ensuring that Claude subscription session windows (Pro or Max) remain active. This project does not involve Claude's direct API endpoints — it strictly uses CLI-based calls. The goal is to maximize continuous access during coding sessions without requiring manual intervention or repeated logins.
+
+## Core Features
+
+1. Claude Code CLI Integration
+   - Uses the official Claude Code CLI for sending minimal "ping" prompts at a configurable interval (default: every 5 hours).
+   - Keeps Claude Code sessions active, preventing unexpected timeouts or downtime during development.
+   - Executes CLI commands with bearer tokens obtained during authentication.
+
+2. OAuth Authentication (Non-interactive Init)
+   - Supports OAuth 2.0 with PKCE, handled once at initialization inside the container.
+   - User runs an init script that prints an OAuth URL.
+   - User opens the link in the browser and logs in.
+   - User retrieves a verification code and pastes it into the script.
+   - Script exchanges the verification code for access and refresh tokens, stored inside the container.
+   - Tokens are automatically refreshed by Claude CLI without user interaction.
+
+3. Session Automation
+   - After auth initialization, claudepulse prompt user to suggest entering automation mode.
+   - Periodically sends a CLI dummy “ping” message at the configured interval.
+   - Default interval: 5 hours, configurable by environment variable.
+   - Automation is designed to guarantee uninterrupted Claude Code sessions.
+
+4. Docker Deployment
+   - Container bundles Node.js runtime, Claude Code CLI, and helper scripts.
+   - Provides consistent environment and simplifies installation.
+   - Supports persistent volume storage of auth credentials.
+   - Workflow:
+     1. Run init script with Docker to authenticate.
+     2. Run start script in detached mode to keep Claude Code session alive.
+
+5. Configurable Environment Variables
+   - PING_MESSAGE: default "ping"
+   - INTERVAL_HOURS: default 5
+   - LOG_LEVEL: info, debug, error
+   - NODE_ENV: production or development
+
+## User Experience
+1. Initialization flow:
+   - User runs `docker run -it claudepulse npm run authenticate`
+   - Script prints a login URL, user logs in and copies verification code.
+   - Verification code is pasted back into script.
+   - Container securely stores tokens for reuse.
+
+2. Automation flow:
+   - User runs `docker run -d claudepulse npm run start`
+   - Container executes scheduled Claude Code CLI ping every INTERVAL_HOURS.
+   - Logs show token refresh, ping execution, and any errors.
+
+## Technical Architecture
+
+- System Components:
+  - Docker container
+  - Node.js runtime
+  - Claude Code CLI
+  - Auth initialization and automation scripts
+  - Local file-based token persistence
+
+- Data Models:
+  - OAuth credentials: access_token, refresh_token, expiry
+  - Scheduler state: next ping interval
+  - Logging output
+
+- APIs and Integrations:
+  - OAuth authorization and token exchange endpoints
+  - Claude Code CLI
+
+- Infrastructure requirements:
+  - Docker installed on host
+  - Network access to OAuth servers
+
+## Development Roadmap
+
+MVP Requirements:
+1. Auth Flow
+   - PKCE verifier/challenge
+   - Init script for login URL and verification code input
+   - Exchange code → tokens
+   - Token refresh logic
+
+2. CLI Automation
+   - Interval scheduler
+   - CLI ping execution
+   - Retry with exponential backoff
+
+3. Docker Packaging
+   - Dockerfile with dependencies
+   - auth-init.sh and start.sh scripts
+   - Persistent storage for tokens
+
+4. Logging
+   - Timestamps, auth status, pings, refreshes
+
+5. Documentation
+   - Auth setup guide
+   - Docker commands for run/init
+   - Environment variable reference
+
+Future Enhancements:
+- Randomized prompt templates
+- Container healthcheck
+- Pause/resume with signals
+- Web-based setup page
+
+## Risks and Mitigations
+- OAuth complexity: clear documentation and guided init script.
+- Network reliability: retry with backoff.
+- Token persistence: managed via Docker volume.
+- Feature creep: MVP restricted to CLI pings.
+
+## Container Specifications
+- Base image: Node.js Alpine
+- Installed tools: Claude Code CLI + Node scripts
+- Storage: Persistent auth tokens in volume
+- Modes: init (auth-init.sh), run (start.sh)
+
+## PKCE Flow Implementation
+- Code verifier: random 32-byte base64 string
+- Code challenge: SHA256 → base64
+- State: CSRF protection token
+- URL construction: includes response_type, code_challenge, etc.
+- Exchange: verification code → access/refresh tokens

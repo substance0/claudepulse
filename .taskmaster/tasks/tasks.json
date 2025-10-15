@@ -1,0 +1,211 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 26,
+        "title": "Implement PKCE OAuth Flow with Enhanced Security",
+        "description": "Complete the OAuth 2.0 with PKCE implementation including code verifier/challenge generation, state management, and secure token exchange",
+        "details": "Enhance the existing OAuth implementation in src/auth/oauth.js to include proper PKCE flow with crypto.randomBytes(32).toString('base64url') for code verifier, SHA256 hash for code challenge, and CSRF state token. Implement URL construction with all required parameters: response_type=code, client_id, redirect_uri, code_challenge, code_challenge_method=S256, state, and scope. Add verification code exchange logic that validates state parameter and exchanges authorization code for access/refresh tokens.",
+        "testStrategy": "Unit tests for PKCE parameter generation, OAuth URL construction validation, and token exchange flow. Integration tests for complete authentication workflow with mock OAuth server responses.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 27,
+        "title": "Create Interactive Authentication Setup Script",
+        "description": "Develop the setup-oauth.mjs script for guided OAuth authentication with URL generation and verification code input",
+        "details": "Build an interactive CLI script that guides users through OAuth setup: 1) Generate PKCE parameters and OAuth URL, 2) Display formatted URL with clear instructions, 3) Prompt for verification code input with validation, 4) Exchange code for tokens and store securely, 5) Verify token validity with test API call. Use readline for user input, provide clear error messages, and include option to automatically start ClaudePulse after successful auth. Script should handle network errors gracefully and provide retry options.",
+        "testStrategy": "Integration tests with OAuth flow simulation, user input mocking, and credential storage verification. Manual testing with actual OAuth endpoints to ensure real-world functionality.",
+        "priority": "high",
+        "dependencies": [
+          26
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 28,
+        "title": "Enhance Credential Storage with Security Features",
+        "description": "Implement secure token persistence with proper file permissions, encryption at rest, and atomic write operations",
+        "details": "Enhance credential storage in ~/.claude/.credentials.json with file permissions 600, atomic write operations using fs.writeFileSync with temp files, and optional encryption at rest using Node.js crypto module. Implement credential validation, corruption detection, and automatic backup. Add credential rotation logging and secure deletion of old tokens. Ensure Docker volume compatibility with proper ownership (claudeapp:1001).",
+        "testStrategy": "Unit tests for file operations, permission verification, and encryption/decryption. Integration tests for Docker volume mounting and multi-user scenarios.",
+        "priority": "medium",
+        "dependencies": [
+          26
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 29,
+        "title": "Implement Smart Token Refresh Logic",
+        "description": "Create intelligent token refresh system that considers scheduling intervals and prevents unnecessary API calls",
+        "details": "Implement smart refresh logic that calculates optimal refresh timing based on token expiry and next scheduled keepalive. Use formula: refresh_time = expiry - max(standard_buffer_5min, interval_hours + safety_buffer_10min). Add exponential backoff for refresh failures (2^attempt * 1000ms base), token validation before refresh attempts, and fallback to immediate refresh if calculation results in past time. Include refresh success/failure metrics and automatic re-authentication trigger after consecutive failures.",
+        "testStrategy": "Unit tests for refresh timing calculations, edge cases with expired tokens, and backoff logic. Integration tests with mock OAuth refresh endpoints and various interval configurations.",
+        "priority": "high",
+        "dependencies": [
+          26,
+          28
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 30,
+        "title": "Develop Claude CLI Integration with Retry Logic",
+        "description": "Create robust Claude CLI execution wrapper with error handling, retry mechanisms, and response parsing",
+        "details": "Enhance the ClaudeClient class with robust CLI execution using child_process.spawn for better control and streaming. Implement bearer token injection, timeout handling (30s default), and response parsing. Add exponential backoff retry logic for transient failures: network errors, rate limits, and timeout errors. Include Claude CLI version detection, installation verification, and compatibility checks. Support both simple text prompts and structured commands.",
+        "testStrategy": "Unit tests for CLI command construction, error parsing, and retry logic. Integration tests with actual Claude CLI installation, mock network conditions, and timeout scenarios.",
+        "priority": "high",
+        "dependencies": [
+          29
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 31,
+        "title": "Build Intelligent Scheduling System",
+        "description": "Implement configurable scheduler with interval management, and failure handling",
+        "details": "Enhance the ClaudeScheduler class with configurable intervals via INTERVAL_HOURS environment variable, and intelligent failure handling. Implement consecutive failure tracking, automatic retry with exponential backoff, and circuit breaker pattern after 5 consecutive failures. Add scheduler state persistence, graceful shutdown handling, and manual trigger capability via force-keepalive command.",
+        "testStrategy": "Unit tests for interval calculations and failure handling logic. Integration tests for long-running scheduler behavior, signal handling, and state persistence across restarts.",
+        "priority": "medium",
+        "dependencies": [
+          30
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 32,
+        "title": "Create Docker Production Deployment System",
+        "description": "Finalize Docker configuration with health checks, security hardening, and deployment scripts",
+        "details": "Complete Docker setup with multi-stage builds for optimal image size, comprehensive health checks that verify both Node.js and Claude CLI functionality, and security hardening: non-root user (claudeapp:1001), read-only filesystem where possible, and dropped capabilities. Create deployment scripts for one-command setup: docker build, authentication, and automated startup. Include docker-compose.yml with proper volume mounting, environment variable templates, and restart policies.",
+        "testStrategy": "Docker integration tests for build process, health check functionality, and volume persistence. Security scanning with tools like docker-bench-security and vulnerability assessment.",
+        "priority": "medium",
+        "dependencies": [
+          31
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 33,
+        "title": "Implement Comprehensive Logging System",
+        "description": "Create structured logging with configurable formats, log levels, and monitoring integration",
+        "details": "Enhance the Logger class with configurable output formats: human-readable inline for development and JSON for production tooling. Implement structured logging categories (auth, keepalive, scheduler, storage, command, error), configurable log levels (ERROR, WARN, INFO, DEBUG, TRACE), and performance metrics tracking. Add log rotation, file output options, and integration points for monitoring systems. Include log aggregation for Docker environments.",
+        "testStrategy": "Unit tests for log formatting, filtering, and rotation. Integration tests for different log configurations and performance impact measurement.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 34,
+        "title": "Create Environment Configuration Management",
+        "description": "Implement comprehensive configuration system with validation, defaults, and environment-specific settings",
+        "details": "Create centralized configuration management that loads from environment variables, .env files, and command-line arguments with precedence order. Implement configuration validation using JSON Schema or similar, type conversion, and default value handling. Support development/production environment profiles, configuration hot-reloading for non-critical settings, and configuration export for debugging. Include configuration documentation generation and validation reporting.",
+        "testStrategy": "Unit tests for configuration loading, validation, and precedence. Integration tests for different environment scenarios and configuration error handling.",
+        "priority": "low",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 35,
+        "title": "Develop Testing and Quality Assurance Suite",
+        "description": "Create comprehensive test suite with unit tests, integration tests, and CI/CD pipeline integration",
+        "details": "Develop complete testing infrastructure using Node.js built-in test runner or Jest alternative. Create test files for each component: oauth flow testing with mock endpoints, scheduler behavior testing with time manipulation, CLI integration testing with mock Claude CLI, and Docker container testing with testcontainers. Implement test data management, mock service setup, and coverage reporting. Add performance benchmarks, load testing for long-running scenarios, and security testing for credential handling.",
+        "testStrategy": "Meta-testing approach with test suite validation, coverage requirements (>90%), and automated testing in CI/CD pipeline. Manual testing protocols for Docker deployment and OAuth flow validation.",
+        "priority": "medium",
+        "dependencies": [
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34
+        ],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 36,
+        "title": "Built-in Claude Code OAuth Authentication",
+        "description": "Integrate native OAuth flow directly into ClaudePulse to eliminate dependency on external Claude CLI authentication, providing seamless built-in authentication experience",
+        "details": "Implement a complete OAuth 2.0 with PKCE flow for Claude authentication directly within ClaudePulse, removing the dependency on external Claude CLI authentication. Create OAuthClient class to handle authorization URL generation, token exchange, and credential storage. Implement secure credential storage in ~/.claude/.credentials.json following existing patterns from claude-client.js:32. Add OAuth flow endpoints: authorization redirect handling, callback processing, and token refresh mechanisms. Integrate with existing ClaudeClient class to replace CLI-based authentication with direct API calls using stored OAuth tokens. Implement proper error handling for OAuth failures, token expiration, and refresh scenarios. Add configuration options for OAuth client credentials and redirect URIs. Ensure compatibility with existing authentication status checking in scheduler.js:309-318 and maintain backward compatibility with current CLI-based approach as fallback.",
+        "testStrategy": "Unit tests for OAuth flow components: authorization URL generation, PKCE challenge/verifier generation, token exchange, and credential storage/retrieval. Integration tests for complete OAuth flow with mock Anthropic OAuth endpoints. Test authentication status checking integration with existing scheduler logic. Verify secure credential storage and token refresh mechanisms. Test fallback to CLI authentication when OAuth fails. Manual testing of OAuth flow in browser and callback handling.",
+        "status": "pending",
+        "dependencies": [
+          30,
+          34
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 37,
+        "title": "Web Portal for Authentication and Configuration",
+        "description": "Create a user-friendly web interface for ClaudePulse setup, authentication management, configuration tuning, and monitoring dashboard.",
+        "details": "Develop a comprehensive web portal using Node.js built-in HTTP server (following the project's zero-dependency approach) or Express.js if web framework is needed. Create a single-page application with: 1) Authentication management interface - OAuth status display, login/logout buttons, credential validation, and session information; 2) Configuration panel - environment variable editor with validation, real-time config preview, import/export functionality, and preset configurations for common use cases; 3) Monitoring dashboard - live pulse status, scheduler state, rate limit information, session tracking, and log viewer with filtering; 4) Setup wizard for first-time users with step-by-step configuration guidance. Implement secure session management, CSRF protection, and input validation. Use modern vanilla JavaScript or lightweight framework for frontend interactivity. Include responsive design for mobile access and dark/light theme support. Integrate with existing Logger system for audit trails and use the configuration management system from src/config/index.js. Support real-time updates via WebSockets or Server-Sent Events for live status monitoring.",
+        "testStrategy": "Unit tests for web server setup, route handlers, authentication middleware, and configuration validation endpoints. Integration tests for OAuth flow integration, real-time monitoring updates, and configuration persistence. End-to-end tests using headless browser automation for complete user workflows: initial setup, configuration changes, and monitoring dashboard functionality. Security testing for authentication bypass, CSRF attacks, and input validation. Performance testing for concurrent users and real-time update scalability.",
+        "status": "pending",
+        "dependencies": [
+          34,
+          36
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 38,
+        "title": "Automate Multi-Platform Docker Image Publishing to GitHub Registry",
+        "description": "Set up a GitHub Actions workflow to automatically build, tag, and publish multi-platform (amd64, arm64) Docker images to the GitHub Container Registry (ghcr.io), including integrated security scanning.",
+        "details": "Create a new GitHub Actions workflow file at `.github/workflows/docker-publish.yml`. This workflow will trigger on pushes to the `main` branch and on the creation of version tags (e.g., `v1.2.3`).\n\n1.  **Permissions & Authentication**: Configure the workflow to grant the `GITHUB_TOKEN` `packages: write` permissions. Use the `docker/login-action` to authenticate with `ghcr.io`.\n2.  **Metadata & Tagging**: Implement `docker/metadata-action` to automatically generate image tags. For pushes to `main`, tags should include `latest` and the Git SHA. For version tags like `v1.2.3`, generate tags `1.2.3`, `1.2`, and `1`.\n3.  **Multi-Platform Build**: Use `docker/setup-qemu-action` and `docker/setup-buildx-action` to prepare the environment for cross-platform builds. Configure the `docker/build-push-action` to build and push for `linux/amd64` and `linux/arm64` platforms, ensuring broad compatibility.\n4.  **Security Scanning**: After the image is pushed, add a subsequent step or job that uses `aquasecurity/trivy-action` to scan the newly published image for vulnerabilities. The scan should be configured to fail the workflow if any `HIGH` or `CRITICAL` severity vulnerabilities are found.",
+        "testStrategy": "1.  **Trigger Verification**: Confirm the workflow runs successfully on a push to `main` and on pushing a new version tag (e.g., `git tag v1.0.0 && git push origin v1.0.0`). Verify it does *not* run on pushes to feature branches.\n2.  **Registry Verification**: Check the project's 'Packages' section in GitHub to confirm the new images and tags (`latest`, SHA, versioned) have been published to `ghcr.io`.\n3.  **Manifest Inspection**: Use `docker manifest inspect ghcr.io/<owner>/claudeup:latest` to verify that the manifest list contains entries for both `linux/amd64` and `linux/arm64` architectures.\n4.  **Platform Testing**: Pull and run the image on both an `amd64` (e.g., standard Linux server) and an `arm64` (e.g., AWS Graviton, Raspberry Pi, Apple Silicon) machine to ensure full functionality on each platform.\n5.  **Scan Report Review**: Check the GitHub Actions logs for the Trivy scan results to ensure it completed and passed. Manually review the generated report for any reported vulnerabilities.",
+        "status": "pending",
+        "dependencies": [
+          32,
+          35
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 39,
+        "title": "Implement Automated GitHub Release Workflow",
+        "description": "Create a GitHub Actions workflow to automate semantic versioning, changelog generation, asset packaging, and the creation of GitHub releases based on conventional commit messages.",
+        "details": "Implement a fully automated release process using `semantic-release` and GitHub Actions. This workflow will analyze commit messages on the `main` branch, determine the next semantic version, generate a changelog, create a Git tag, and publish a GitHub Release.\n\n1.  **Workflow File Creation**: Create a new GitHub Actions workflow at `.github/workflows/release.yml`.\n2.  **Workflow Trigger**: Configure the workflow to trigger on every successful push to the `main` branch.\n3.  **Tooling Setup**:\n    *   Add `semantic-release` and its necessary plugins to `devDependencies` in `package.json`: `npm install --save-dev semantic-release @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/changelog @semantic-release/npm @semantic-release/git @semantic-release/github`.\n    *   Create a configuration file `.releaserc.json` in the project root.\n4.  **Configuration (`.releaserc.json`)**:\n    *   Set the `branches` property to `[\"main\"]`.\n    *   Configure the `plugins` array in the correct order: `commit-analyzer`, `release-notes-generator`, `changelog` (to update CHANGELOG.md), `npm` (to update package.json version), `git` (to commit updated files), and `github` (to create the release).\n5.  **GitHub Actions Workflow (`release.yml`) Steps**:\n    *   **Permissions**: Grant the job `contents: write` and `issues: write` permissions to allow creating releases, committing files, and commenting on issues.\n    *   **Checkout**: Use `actions/checkout@v4` to check out the code.\n    *   **Setup Node.js**: Use `actions/setup-node@v4` with a specific Node.js version (e.g., 20.x).\n    *   **Install Dependencies**: Run `npm ci` to install project dependencies.\n    *   **Execute Semantic Release**: Run the release process with `npx semantic-release`. Pass the `GITHUB_TOKEN` as an environment variable: `env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`.\n6.  **Prerequisite**: Ensure the team adopts the [Conventional Commits specification](https://www.conventionalcommits.org/) for all commits to `main`, as this is what `semantic-release` uses to determine version bumps (e.g., `fix:` for patch, `feat:` for minor, `BREAKING CHANGE:` for major).",
+        "testStrategy": "1.  **Dry Run Verification**: On a feature branch, add the configuration and workflow files. Modify the workflow to run `npx semantic-release --dry-run` and verify in the action logs that it correctly calculates the next version and generates the expected changelog without publishing.\n2.  **Main Branch Integration Test**: After merging to `main`, push a commit with a conventional commit message (e.g., `git commit -m \"fix: resolve minor bug for release testing\"`).\n3.  **Release Verification**: Confirm that the `release.yml` workflow triggers and completes successfully.\n4.  **Artifacts Check**: \n    *   Verify that a new version tag (e.g., `v1.0.0`) has been pushed to the repository.\n    *   Check the 'Releases' section of the GitHub repository for a new release with a title matching the tag and auto-generated release notes.\n    *   Confirm that a new commit titled like `chore(release): 1.0.0 [skip ci]` exists on the `main` branch, updating `package.json` and `CHANGELOG.md`.\n5.  **Downstream Workflow Trigger**: Critically, verify that the new tag successfully triggers the 'Automate Multi-Platform Docker Image Publishing' workflow defined in Task 38, ensuring the end-to-end CI/CD pipeline is connected.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 40,
+        "title": "Integrate Discord Notifications for Failure Alerts",
+        "description": "Implement Discord webhook integration to send real-time notifications when ClaudePulse encounters authentication failures, rate limits, or other critical errors requiring user attention.",
+        "details": "1. **Configuration Update**: Extend the environment configuration system established in Task 34. Add a new optional environment variable `DISCORD_WEBHOOK_URL`. The notification logic should remain dormant if this variable is not provided.\n2. **Notification Service**: Create a new reusable module at `src/services/notificationService.js`. This module will export a single asynchronous function, `sendDiscordAlert(payload)`. This function will use the native `fetch` API to send a POST request to the configured webhook URL. It should handle potential network errors gracefully.\n3. **Rich Embed Formatting**: The `sendDiscordAlert` function will format the `payload` (containing title, description, fields, error level) into a Discord embed object. This allows for structured, color-coded messages. For example, 'ERROR' level alerts should have a red color accent.\n4. **Logger Integration**: Modify the `Logger` class from Task 33. Enhance the `error` method to check if `DISCORD_WEBHOOK_URL` is configured. If it is, the method will invoke `sendDiscordAlert`, passing structured data from the log event (e.g., error message, category, timestamp, metadata). This centralizes the trigger point for all critical error notifications.\n5. **Targeted Error Reporting**: Ensure key failure points provide structured metadata to the logger for rich notifications:\n    - **Authentication (Tasks 29, 36)**: In `try/catch` blocks for token refresh and OAuth exchange, call `logger.error` with metadata like `{ component: 'Auth', errorCode: 'TOKEN_REFRESH_FAILURE' }`.\n    - **API Client**: When handling API responses, specifically catch 401/403 (Authentication) and 429 (Rate Limit) status codes and log them with relevant context.",
+        "testStrategy": "1. **Unit Tests**: Create `notificationService.test.js`. Mock the global `fetch` API to verify that `sendDiscordAlert` constructs the correct Discord embed JSON payload and request headers. Test the graceful-off state where no `fetch` call is made if the webhook URL is not configured.\n2. **Integration Tests**: In the test suite for the `Logger` class, mock the `notificationService`. Trigger `logger.error()` with sample error data and assert that `sendDiscordAlert` is called with the correctly transformed payload.\n3. **Manual End-to-End Test**: Configure a valid `DISCORD_WEBHOOK_URL` in a local `.env` file. Manually trigger a known failure, such as revoking the app's OAuth token and waiting for the next keepalive cycle. Verify that a well-formatted, detailed error notification appears in the designated Discord channel.",
+        "status": "pending",
+        "dependencies": [
+          33,
+          34
+        ],
+        "priority": "medium",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-09-21T20:19:09.222Z",
+      "updated": "2025-09-27T09:25:25.363Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

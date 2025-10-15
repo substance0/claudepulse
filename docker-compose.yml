@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  claudepulse:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claudepulse
+    restart: unless-stopped
+    environment:
+      # Core configuration
+      - PROMPT_TEXT=${PROMPT_TEXT:-pulse check}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_BACKOFF_MULTIPLIER=${RETRY_BACKOFF_MULTIPLIER:-2}
+      - MAX_BACKOFF_MINUTES=${MAX_BACKOFF_MINUTES:-30}
+      - RESET_HOUR=${RESET_HOUR}
+
+      # Logging configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-inline}
+      - NODE_ENV=${NODE_ENV:-production}
+
+      # Legacy debug flag
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      # Optional: mount credentials directory to persist authentication
+      - claude_credentials:/home/claudeapp/.claude
+      # Optional: mount logs directory
+      - ./logs:/app/logs
+    labels:
+      - "com.claudepulse.service=claudepulse"
+      - "com.claudepulse.description=ClaudePulse: Maintain steady pulse on Claude Pro/Max sessions for maximum coding availability"
+    # Simple healthcheck that doesn't depend on external tools
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 2m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  claude_credentials:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/.claude

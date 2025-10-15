@@ -1,0 +1,102 @@
+{
+  "name": "claudepulse",
+  "version": "1.0.0",
+  "description": "Automated Claude session management with intelligent pulse scheduling for maximum Pro/Max subscription value",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "claudepulse": "src/index.js"
+  },
+  "files": [
+    "src/",
+    "Dockerfile",
+    "docker-compose.yml",
+    "README.md",
+    "ENVIRONMENT.md"
+  ],
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "NODE_ENV=development LOG_LEVEL=DEBUG node src/index.js",
+    "prod": "NODE_ENV=production LOG_LEVEL=INFO node src/index.js",
+    "lint": "echo 'Linting JavaScript files...' && find src -name '*.js' -exec node -c {} \\;",
+    "docker:build": "docker build -t claudepulse . --load",
+    "docker:build:fresh": "docker build --no-cache -t claudepulse . --load",
+    "docker:run": "docker run -dt --name claudepulse claudepulse",
+    "docker:run:hold": "docker run -dt --name claudepulse -e KEEP_PULSE_ON_FAILURE=true claudepulse",
+    "docker:run:interactive": "docker run -it --name claudepulse claudepulse",
+    "docker:run:restart": "docker run -dt --name claudepulse --restart unless-stopped claudepulse",
+    "docker:bash": "docker exec -it claudepulse /bin/sh",
+    "docker:debug": "docker run -dt --name claudepulse --restart unless-stopped -e DRY_RUN=true -e LOG_LEVEL=DEBUG claudepulse",
+    "docker:start": "docker start claudepulse",
+    "docker:stop": "docker stop claudepulse",
+    "docker:rm": "docker rm claudepulse",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker logs -f claudepulse",
+    "docker:restart": "npm run docker:down && npm run docker:up",
+    "docker:clean": "docker system prune -f && docker image prune -f",
+    "logs": "mkdir -p logs && tail -f logs/claudepulse.log",
+    "force-pulse": "node -e \"import('./src/automation/scheduler.js').then(({ClaudeScheduler}) => ClaudeScheduler.create().then(s => s.forcePulse().then(() => process.exit(0))))\""
+  },
+  "keywords": [
+    "claude",
+    "anthropic",
+    "automation",
+    "oauth",
+    "oauth2",
+    "pkce",
+    "session",
+    "pulse",
+    "scheduler",
+    "docker",
+    "cli",
+    "ai"
+  ],
+  "author": {
+    "name": "ClaudePulse Project",
+    "email": "contact@claudepulse.dev",
+    "url": "https://github.com/claudepulse/claudepulse"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/substance0/claudepulse#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/substance0/claudepulse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/substance0/claudepulse/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "semantic-release": "^24.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/release-notes-generator": "^14.0.0",
+    "@semantic-release/changelog": "^6.0.0",
+    "@semantic-release/github": "^11.0.0",
+    "@semantic-release/git": "^10.0.0"
+  },
+  "peerDependencies": {},
+  "optionalDependencies": {},
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/claudepulse"
+  },
+  "config": {
+    "logLevel": "INFO",
+    "defaultInterval": "5",
+    "maxRetries": "3"
+  }
+}

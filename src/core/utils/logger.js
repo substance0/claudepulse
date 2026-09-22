@@ -747,6 +747,8 @@ export class Logger {
       service: this.service,
       version: this.version,
       enableColors: this.enableColors,
+      // Without this, alerts raised through a child logger are dropped.
+      discordWebhookUrl: this.discordWebhookUrl,
     });
 
     // Override the _log method to include additional context

@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+
 /** Model used for pulses. A pulse needs no capability, only a session. */
 const PULSE_MODEL = "haiku";
 
@@ -51,6 +53,51 @@ export class ClaudeCliExecutor {
 
     this.logger = options.logger;
     this.cwd = options.cwd;
+    this.binary = options.binary || "claude";
+  }
+
+  /**
+   * Run one pulse.
+   * @param {string} promptText - Message sent to Claude
+   * @returns {Promise<{success: boolean, authFailure: boolean, message?: Object, error?: string}>}
+   */
+  async pulse(promptText) {
+    const args = ClaudeCliExecutor.buildArgs(promptText);
+
+    return new Promise((resolve) => {
+      const child = spawn(this.binary, args, {
+        cwd: this.cwd,
+        // Thinking accounted for 148 of 169 output tokens by default, and a
+        // pulse has nothing to reason about.
+        env: { ...process.env, MAX_THINKING_TOKENS: "0" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let stdout = "";
+      let stderr = "";
+
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+
+      child.on("error", (err) => {
+        resolve(
+          ClaudeCliExecutor.parseResult({
+            stdout: "",
+            stderr: err.message,
+            exitCode: 127,
+          }),
+        );
+      });
+
+      child.on("close", (exitCode) => {
+        resolve(ClaudeCliExecutor.parseResult({ stdout, stderr, exitCode }));
+      });
+    });
   }
 
   /**

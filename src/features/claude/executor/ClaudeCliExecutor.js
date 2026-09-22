@@ -42,6 +42,8 @@ export class ClaudeCliExecutor {
    * @param {Object} options - Configuration options
    * @param {Object} options.logger - Logger instance
    * @param {string} options.cwd - Empty directory the subprocess runs in
+   * @param {string} [options.configDir] - Config directory for the CLI
+   * @param {string} [options.binary] - Path to the Claude CLI
    */
   constructor(options = {}) {
     if (!options.logger) {
@@ -53,6 +55,7 @@ export class ClaudeCliExecutor {
 
     this.logger = options.logger;
     this.cwd = options.cwd;
+    this.configDir = options.configDir;
     this.binary = options.binary || "claude";
   }
 
@@ -67,9 +70,15 @@ export class ClaudeCliExecutor {
     return new Promise((resolve) => {
       const child = spawn(this.binary, args, {
         cwd: this.cwd,
-        // Thinking accounted for 148 of 169 output tokens by default, and a
-        // pulse has nothing to reason about.
-        env: { ...process.env, MAX_THINKING_TOKENS: "0" },
+        env: {
+          ...process.env,
+          // Thinking accounted for 148 of 169 output tokens by default, and a
+          // pulse has nothing to reason about.
+          MAX_THINKING_TOKENS: "0",
+          // Inheriting the host's config directory loads whatever skills,
+          // plugins and agents live there, which measured 2.4x more expensive.
+          ...(this.configDir ? { CLAUDE_CONFIG_DIR: this.configDir } : {}),
+        },
         stdio: ["ignore", "pipe", "pipe"],
       });
 

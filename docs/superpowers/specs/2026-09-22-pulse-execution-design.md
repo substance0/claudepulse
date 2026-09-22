@@ -119,9 +119,24 @@ Keep the default. Spend the effort on thinking tokens and model choice instead.
 cwd:     an empty directory, never the application directory
 model:   --model haiku
 env:     MAX_THINKING_TOKENS=0
+         CLAUDE_CONFIG_DIR=<a directory used only for pulses>
 flags:   --strict-mcp-config --settings '{}' --no-session-persistence
 prompt:  a short fixed string
 ```
+
+A second set of measurements, taken against the real CLI rather than a stub:
+
+| Config directory        | Cost/pulse |
+| ----------------------- | ---------- |
+| Inherited from the host | $0.0360    |
+| Pinned, cold cache      | $0.0152    |
+| Pinned, warm cache      | $0.0076    |
+
+`--settings '{}'` and `--strict-mcp-config` are not sufficient on their own.
+Without a pinned `CLAUDE_CONFIG_DIR` the pulse still loads whatever skills,
+plugins and agents the host's configuration directory contains, which cost
+2.4x more here. The first pulse after a restart pays cache creation; steady
+state is the warm figure.
 
 Each element earns its place:
 
@@ -133,6 +148,8 @@ Each element earns its place:
 - **`MAX_THINKING_TOKENS=0`** — thinking was 148 of 169 output tokens by default.
 - **`--strict-mcp-config`** — excludes MCP servers and their tool definitions.
 - **`--settings '{}'`** — excludes user settings, skills and hooks.
+- **`CLAUDE_CONFIG_DIR`** — pins the configuration directory so the pulse never
+  inherits the host's. Measured 2.4x cheaper; see the table above.
 - **Default system prompt** — preserves the cache, per the measurement above.
 
 ### Do not use `--bare`

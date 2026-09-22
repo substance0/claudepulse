@@ -20,12 +20,12 @@ async function writeStub(dir, stdout, exitCode) {
 }
 
 /** Write a stub that records the environment it was given. */
-async function writeEnvProbe(dir) {
-  const out = path.join(dir, "env-probe.txt");
-  const file = path.join(dir, "probe-claude");
+async function writeEnvProbe(dir, varName = "MAX_THINKING_TOKENS") {
+  const out = path.join(dir, `env-probe-${varName}.txt`);
+  const file = path.join(dir, `probe-claude-${varName}`);
   await fs.writeFile(
     file,
-    `#!/bin/sh\nprintf '%s' "$MAX_THINKING_TOKENS" > ${out}\necho '{}'\n`,
+    `#!/bin/sh\nprintf '%s' "$${varName}" > ${out}\necho '{}'\n`,
   );
   await fs.chmod(file, 0o755);
   return { binary: file, out };
@@ -108,4 +108,24 @@ test("disables thinking tokens in the subprocess environment", async () => {
 
   // Assert - thinking was 148 of 169 output tokens by default
   assert.equal(await fs.readFile(out, "utf8"), "0");
+});
+
+test("pins the config directory so the pulse loads no host configuration", async () => {
+  // Arrange
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "cp-exec-"));
+  const configDir = path.join(dir, "config");
+  const { binary, out } = await writeEnvProbe(dir, "CLAUDE_CONFIG_DIR");
+  const executor = new ClaudeCliExecutor({
+    logger: NOOP_LOGGER,
+    cwd: dir,
+    configDir,
+    binary,
+  });
+
+  // Act
+  await executor.pulse("pulse check");
+
+  // Assert - inheriting the host's config dir measured 2.4x more expensive,
+  // because it loads whatever skills, plugins and agents happen to be there
+  assert.equal(await fs.readFile(out, "utf8"), configDir);
 });

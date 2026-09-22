@@ -30,13 +30,8 @@ services:
     labels:
       - "com.claudepulse.service=claudepulse"
       - "com.claudepulse.description=ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value"
-    # Simple healthcheck that doesn't depend on external tools
-    healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
-      interval: 2m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    # Healthcheck comes from the image, which verifies the Claude CLI the SDK
+    # depends on. Defining one here would override it.
     restart: unless-stopped
 
 volumes:

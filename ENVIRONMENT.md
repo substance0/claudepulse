@@ -96,6 +96,9 @@ See [Scheduling Strategies](docs/workflow-diagrams.md#3-scheduling-strategy-sele
 - Exponential backoff between retries
 - Total retry time: ~1-30 minutes (depends on backoff settings)
 - Cycle limit errors are handled specially (not retried, schedule adjusted instead)
+- Authentication failures are not retried either. An expired or rejected token
+  needs re-authentication, so the cycle is abandoned after the first attempt
+  rather than repeating a request that cannot succeed.
 
 **Examples:**
 
@@ -286,6 +289,8 @@ docker run -v /custom/path:/home/claudepulse/.claude claudepulse
 
 ---
 
+---
+
 ### `DISCORD_WEBHOOK_URL`
 
 **Purpose:** Enable Discord notifications for error alerts.
@@ -299,6 +304,13 @@ docker run -v /custom/path:/home/claudepulse/.claude claudepulse
 - Includes error details, category, timestamp, and context
 - Non-blocking (failures don't affect application)
 - Only triggers on actual errors (not INFO/WARN logs)
+- Repeated pulse failures alert at widening intervals — on the 1st, 2nd, 4th,
+  8th consecutive failure and so on — instead of once per cycle. A sustained
+  outage therefore stays visible without flooding the channel, and the counter
+  resets on the first successful pulse.
+
+The webhook URL is masked as `[REDACTED]` in the startup configuration log, so
+it is not exposed to anyone reading container logs.
 
 **Setup:**
 

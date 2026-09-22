@@ -41,6 +41,49 @@ function parseConfig(options) {
 }
 
 /**
+ * Decide whether a run of consecutive failures warrants another alert.
+ * Alerting on every cycle buries the signal, so alerts are spaced out
+ * exponentially: the operator hears about a problem promptly, then at
+ * widening intervals for as long as it persists.
+ * @param {number} consecutiveFailures - Failures since the last success
+ * @returns {boolean}
+ */
+export function shouldAlertForFailureCount(consecutiveFailures) {
+  if (!Number.isInteger(consecutiveFailures) || consecutiveFailures < 1) {
+    return false;
+  }
+
+  // Powers of two: 1, 2, 4, 8, 16, ...
+  return (consecutiveFailures & (consecutiveFailures - 1)) === 0;
+}
+
+/**
+ * Detect an authentication failure that retrying cannot resolve.
+ * These need a human to re-authenticate, so further attempts only waste a cycle.
+ * @param {string|Object} error - Error payload from a failed pulse
+ * @returns {boolean}
+ */
+function isUnrecoverableAuthError(error) {
+  if (!error) {
+    return false;
+  }
+
+  const text = typeof error === "string" ? error : JSON.stringify(error);
+
+  // Responses that name an authentication problem in their message.
+  const namesAuthProblem =
+    /authentication_error|invalid_grant|OAuth access token has expired|Please run \/login|only authorized for use with Claude Code/i.test(
+      text,
+    );
+
+  // A 401 or 403 is an authorization decision on its own. Some carry no
+  // message text to match, so the status has to be enough.
+  const rejectedByStatus = /API Error:\s*40[13]\b/i.test(text);
+
+  return namesAuthProblem || rejectedByStatus;
+}
+
+/**
  * Claude Session Automation Scheduler
  * Manages periodic pulse messages to maintain Claude sessions
  * @class PulseScheduler
@@ -345,6 +388,21 @@ export class PulseScheduler {
   }
 
   /**
+   * Report a failed cycle, escalating to error level - which raises an alert -
+   * only at spaced intervals. A persistent outage otherwise alerts on every
+   * cycle, which buries the signal it is meant to raise.
+   * @param {string} message - Human-readable failure description
+   * @param {Object} data - Structured context for the log entry
+   */
+  _reportCycleFailure(message, data) {
+    if (shouldAlertForFailureCount(this.consecutiveFailures)) {
+      this.logger.error("cycle", message, data);
+    } else {
+      this.logger.warn("cycle", message, data);
+    }
+  }
+
+  /**
    * Execute one pulse cycle with retry logic
    * @returns {boolean} True if cycle already rescheduled next run (e.g., due to session limit), false otherwise
    */
@@ -393,6 +451,16 @@ export class PulseScheduler {
         return true; // Already rescheduled, don't schedule again
       }
 
+      // An expired or rejected token cannot be fixed by sending again, so
+      // abandon the cycle instead of burning the remaining attempts.
+      if (isUnrecoverableAuthError(result.error)) {
+        this._reportCycleFailure(
+          "Authentication rejected - re-authenticate to resume pulsing",
+          { error: result.error },
+        );
+        return false;
+      }
+
       // Handle other failures
       this.logger.warn("cycle", `Attempt ${attempt + 1} failed`, {
         error: result.error,
@@ -401,7 +469,7 @@ export class PulseScheduler {
     }
 
     // All retries exhausted
-    this.logger.error("cycle", "All retry attempts exhausted", {
+    this._reportCycleFailure("All retry attempts exhausted", {
       maxRetries: this.config.maxRetries,
       consecutiveFailures: this.consecutiveFailures,
     });

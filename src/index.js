@@ -3,7 +3,11 @@
 import ClaudeClient from "./features/claude/client/ClaudeClient.js";
 import { Logger } from "./core/utils/logger.js";
 import PulseScheduler from "./features/scheduling/automation/scheduler.js";
-import { loadConfig, validateConfig } from "./core/config/index.js";
+import {
+  loadConfig,
+  redactConfigSecrets,
+  validateConfig,
+} from "./core/config/index.js";
 import AuthConfig from "./core/config/auth-config.js";
 import { OAuthManager } from "./features/auth/oauth/OAuthManager.js";
 import SessionTracker from "./features/claude/session/SessionTracker.js";
@@ -333,7 +337,11 @@ async function main() {
       discordWebhookUrl: config.DISCORD_WEBHOOK_URL,
     });
 
-    logger.info("config", "Environment Configuration", config);
+    logger.info(
+      "config",
+      "Environment Configuration",
+      redactConfigSecrets(config),
+    );
 
     // Log local timezone information
     const now = new Date();

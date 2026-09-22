@@ -3,6 +3,28 @@
  * Consolidates all environment variables and defaults in one place
  */
 
+/** Config keys whose values must never reach logs, alerts, or error payloads. */
+const SECRET_CONFIG_KEYS = ["DISCORD_WEBHOOK_URL", "CLAUDE_CODE_OAUTH_TOKEN"];
+
+/**
+ * Return a copy of the config with secret values masked, for safe logging.
+ * Keys that hold no value are left as-is, so an unset secret is not mistaken
+ * for a configured one.
+ * @param {Object} config - Configuration object
+ * @returns {Object} New config object with secrets masked
+ */
+export function redactConfigSecrets(config) {
+  const redacted = { ...config };
+
+  for (const key of SECRET_CONFIG_KEYS) {
+    if (redacted[key]) {
+      redacted[key] = "[REDACTED]";
+    }
+  }
+
+  return redacted;
+}
+
 export const DEFAULT_CONFIG = {
   PROMPT_TEXT: "pulse check",
   MAX_RETRIES: 3,

@@ -2,6 +2,32 @@
 const PULSE_MODEL = "haiku";
 
 /**
+ * Detect an authentication failure that retrying cannot resolve.
+ * These need a human to re-authenticate, so further attempts only waste a
+ * cycle. A credential is never validated up front, so this is the point at
+ * which an expired or rejected one becomes visible.
+ * @param {string} text - Error text from the CLI
+ * @returns {boolean}
+ */
+function isAuthFailure(text) {
+  if (!text) {
+    return false;
+  }
+
+  // Responses that name an authentication problem in their message.
+  const namesAuthProblem =
+    /authentication_error|invalid_grant|OAuth access token has expired|Please run \/login|only authorized for use with Claude Code/i.test(
+      text,
+    );
+
+  // A 401 or 403 is an authorization decision on its own. Some carry no
+  // message text to match, so the status has to be enough.
+  const rejectedByStatus = /API Error:\s*40[13]\b/i.test(text);
+
+  return namesAuthProblem || rejectedByStatus;
+}
+
+/**
  * Runs Claude Code as a subprocess to open a session window.
  *
  * The argument list is deliberately fixed. Two omissions are load-bearing:
@@ -45,5 +71,43 @@ export class ClaudeCliExecutor {
       "--output-format",
       "json",
     ];
+  }
+
+  /**
+   * Convert raw subprocess output into a pulse result.
+   * @param {Object} raw - Raw subprocess output
+   * @param {string} raw.stdout - Standard output, expected to hold JSON
+   * @param {string} raw.stderr - Standard error
+   * @param {number} raw.exitCode - Process exit code
+   * @returns {{success: boolean, authFailure: boolean, message?: Object, error?: string}}
+   */
+  static parseResult({ stdout, stderr, exitCode }) {
+    let parsed = null;
+
+    try {
+      parsed = JSON.parse(stdout);
+    } catch {
+      parsed = null;
+    }
+
+    if (parsed && !parsed.is_error && exitCode === 0) {
+      return {
+        success: true,
+        authFailure: false,
+        message: {
+          total_cost_usd: parsed.total_cost_usd,
+          duration_ms: parsed.duration_ms,
+          session_id: parsed.session_id,
+        },
+      };
+    }
+
+    const detail = parsed?.result || stderr || "Claude CLI failed";
+
+    return {
+      success: false,
+      authFailure: isAuthFailure(detail),
+      error: detail,
+    };
   }
 }

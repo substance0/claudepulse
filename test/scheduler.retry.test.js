@@ -57,7 +57,7 @@ const TRANSIENT_ERROR = JSON.stringify({
 
 function buildScheduler({ pulseError }) {
   const scheduler = new PulseScheduler({
-    client: {},
+    executor: { pulse: async () => ({}) },
     sessionTracker: {
       registerSessionLimitSignal() {},
       getSessionInfo: () => ({}),

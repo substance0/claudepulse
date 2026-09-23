@@ -15,6 +15,7 @@ import CredentialStore from "./features/auth/CredentialStore.js";
 import ClaudeLogReader from "./features/claude/ClaudeLogReader.js";
 import OAuthStateStore from "./features/auth/OAuthStateStore.js";
 import SdkExecutor from "./features/claude/executor/SdkExecutor.js";
+import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
 import ClaudeSdkAdapter from "./features/claude/client/ClaudeSdkAdapter.js";
 import ApiClient from "./features/claude/client/ApiClient.js";
 import { displayBanner } from "./core/utils/banner.js";
@@ -67,82 +68,6 @@ function setupProcessErrorHandlers(scheduler, config) {
   });
 }
 
-async function watchCredentialsAndRetry(scheduler, logger) {
-  const credPath = scheduler.client?.getCredentialsPath() || null;
-
-  async function statMtime(p) {
-    try {
-      const s = await fs.stat(p);
-      return s.mtimeMs;
-    } catch {
-      return null;
-    }
-  }
-
-  let lastMtime = credPath ? await statMtime(credPath) : null;
-  let authCheckInProgress = null; // Store the promise to prevent race conditions
-  return await new Promise((resolve) => {
-    const interval = setInterval(async () => {
-      if (!credPath) return; // wait until client is fully initialized
-      const mtime = await statMtime(credPath);
-      if (mtime && (!lastMtime || mtime > lastMtime)) {
-        lastMtime = mtime;
-
-        // If already checking, wait for that check to complete
-        if (authCheckInProgress) {
-          try {
-            const result = await authCheckInProgress;
-            if (result) {
-              clearInterval(interval);
-              resolve(true);
-            }
-          } catch (error) {
-            logger.debug("auth", "Existing auth check failed");
-          }
-          return;
-        }
-
-        // Start new check and store promise
-        authCheckInProgress = (async () => {
-          try {
-            logger.info(
-              "auth",
-              "Credentials detected, verifying authentication",
-            );
-            // Only check authentication status - don't start scheduler (it will be started later)
-            const authStatus = await scheduler.client.getAuthStatus();
-
-            if (authStatus.authenticated) {
-              clearInterval(interval);
-              logger.debug("auth", "Authentication verification successful");
-              return true;
-            }
-
-            // If still not authenticated, keep watching
-            logger.debug(
-              "auth",
-              "Credentials found but authentication still not valid, continuing to watch",
-            );
-            return false;
-          } catch (error) {
-            logger.debug("auth", "Error checking authentication status", {
-              error: error.message,
-            });
-            return false;
-          } finally {
-            authCheckInProgress = null;
-          }
-        })();
-
-        const result = await authCheckInProgress;
-        if (result) {
-          resolve(true);
-        }
-      }
-    }, 2000);
-  });
-}
-
 /**
  * Initialize and start the ClaudePulse automation scheduler
  * @param {Object} config - Application configuration
@@ -188,7 +113,20 @@ async function runScheduler(config, logger) {
     stateStore,
   });
 
-  // 5.5. Create SDK execution chain (SdkExecutor -> ClaudeSdkAdapter -> ApiClient)
+  // 5.5. Create the pulse executor. It runs Claude Code in a directory of its
+  // own, so a pulse never loads the application's files or configuration.
+  const pulseCwd = path.join(os.tmpdir(), "claudepulse-pulse");
+  const pulseConfigDir = path.join(os.tmpdir(), "claudepulse-config");
+  await fs.mkdir(pulseCwd, { recursive: true });
+  await fs.mkdir(pulseConfigDir, { recursive: true });
+
+  const executor = new ClaudeCliExecutor({
+    logger: clientLogger,
+    cwd: pulseCwd,
+    configDir: pulseConfigDir,
+  });
+
+  // 5.6. Create SDK execution chain (SdkExecutor -> ClaudeSdkAdapter -> ApiClient)
   const sdkExecutor = new SdkExecutor({
     logger: clientLogger,
   });
@@ -229,7 +167,7 @@ async function runScheduler(config, logger) {
 
   // 9. Create PulseScheduler with all dependencies
   const scheduler = new PulseScheduler({
-    client,
+    executor,
     sessionTracker,
     logger,
     config,
@@ -244,53 +182,10 @@ async function runScheduler(config, logger) {
     process.exit(0);
   }
 
-  // Wait for authentication to be successful BEFORE starting scheduler
-  const authStatus = await scheduler.client.getAuthStatus();
-  if (!authStatus.authenticated) {
-    if (authStatus.isOAuthFlow) {
-      logger.info(
-        "auth",
-        "OAuth authentication in progress - waiting for credential creation",
-      );
-      const authSucceeded = await watchCredentialsAndRetry(scheduler, logger);
-      if (!authSucceeded) {
-        if (config.KEEP_PULSE_ON_FAILURE) {
-          logger.warn(
-            "hold",
-            "KEEP_PULSE_ON_FAILURE=true - holding process for debugging",
-          );
-          const holdInterval = setInterval(() => {}, 60 * 1000);
-          return { scheduler: null, heartbeatInterval: holdInterval };
-        }
-        return {
-          error: "Authentication failed",
-          scheduler: null,
-          heartbeatInterval: null,
-        };
-      }
-      logger.info("auth", "Authentication successful");
-    } else {
-      logger.error(
-        "auth",
-        "Authentication required but no OAuth flow initiated",
-      );
-      if (config.KEEP_PULSE_ON_FAILURE) {
-        logger.warn(
-          "hold",
-          "KEEP_PULSE_ON_FAILURE=true - holding process for debugging",
-        );
-        const holdInterval = setInterval(() => {}, 60 * 1000);
-        return { scheduler: null, heartbeatInterval: holdInterval };
-      }
-      return {
-        error: "Authentication required",
-        scheduler: null,
-        heartbeatInterval: null,
-      };
-    }
-  } else {
-    logger.info("auth", "Authentication already valid");
-  }
+  // The Claude CLI authenticates each pulse itself, so there is no credential
+  // state to wait on before starting. A credential that is absent or no longer
+  // accepted surfaces as a failed pulse, which the scheduler reports without
+  // spending its remaining attempts on it.
 
   // Now that authentication is successful, start scheduler ONCE
   const startResult = await scheduler.start();

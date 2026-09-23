@@ -99,8 +99,8 @@ export class PulseScheduler {
    */
   constructor(options = {}) {
     // Validate required dependencies
-    if (!options.client) {
-      throw new Error("PulseScheduler requires client dependency");
+    if (!options.executor) {
+      throw new Error("PulseScheduler requires executor dependency");
     }
     if (!options.sessionTracker) {
       throw new Error("PulseScheduler requires sessionTracker dependency");
@@ -113,7 +113,7 @@ export class PulseScheduler {
     }
 
     // Injected dependencies
-    this.client = options.client;
+    this.executor = options.executor;
     this.sessionTracker = options.sessionTracker;
     this.logger = options.logger.child({
       component: "scheduler",
@@ -235,7 +235,7 @@ export class PulseScheduler {
     }
 
     try {
-      const result = await this.client.pulse(this.config.promptText);
+      const result = await this.executor.pulse(this.config.promptText);
       const duration = this.logger.endTimer(timer);
 
       if (result.success) {

@@ -90,3 +90,29 @@ test("callers never mention latest", () => {
     assert.doesNotMatch(read(name), /latest/, name);
   }
 });
+
+test("nothing is triggered by another workflow finishing", () => {
+  for (const name of fs.readdirSync(".github/workflows")) {
+    assert.doesNotMatch(read(name), /workflow_run/, name);
+  }
+});
+
+test("the old release image workflow is gone", () => {
+  assert.equal(fs.existsSync(".github/workflows/docker-release.yml"), false);
+});
+
+test("the release image is built only when semantic-release created a tag", () => {
+  const text = read("release.yml");
+  assert.match(text, /git tag --points-at HEAD/);
+  assert.match(text, /if: needs\.release\.outputs\.tag != ''/);
+});
+
+test("the release image is built from the tagged release commit", () => {
+  const text = read("release.yml");
+  assert.match(text, /ref: \$\{\{ needs\.release\.outputs\.tag \}\}/);
+  assert.match(text, /channel: release/);
+});
+
+test("release no longer syncs to the retired develop branch", () => {
+  assert.doesNotMatch(read("release.yml"), /develop/);
+});

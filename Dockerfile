@@ -8,6 +8,9 @@ ARG VERSION=unknown
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 
+# Reported at startup, so a running container identifies its build
+ENV CLAUDEPULSE_VERSION=${VERSION}
+
 # Install runtime dependencies, including the Claude CLI that pulses run
 RUN apk add --no-cache \
     tini \

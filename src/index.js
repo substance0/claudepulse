@@ -12,9 +12,6 @@ import { displayBanner } from "./core/utils/banner.js";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const { version: APP_VERSION } = require("../package.json");
 
 function setupShutdownHandlers(heartbeatInterval, scheduler) {
   const shutdown = (signal) => {

@@ -6,6 +6,7 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { resolveAppVersion } from "./appVersion.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,14 +19,14 @@ function getPackageInfo() {
     const packagePath = join(__dirname, "../../../package.json");
     const packageData = JSON.parse(readFileSync(packagePath, "utf8"));
     return {
-      version: packageData.version,
+      version: resolveAppVersion(process.env, packageData.version),
       description: packageData.description,
       homepage: packageData.homepage,
       license: packageData.license,
     };
   } catch (error) {
     return {
-      version: "unknown",
+      version: resolveAppVersion(process.env, "unknown"),
       description: "Automated Claude Code session renewal",
       homepage: "https://github.com/substance0/claudepulse",
       license: "MIT",

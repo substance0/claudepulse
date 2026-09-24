@@ -62,3 +62,35 @@ test("does not mutate the config it is given", () => {
     "https://discord.com/api/webhooks/1/x",
   );
 });
+
+test("masks the window notification webhook URL", () => {
+  // Arrange
+  const config = {
+    DISCORD_WINDOW_WEBHOOK_URL: "https://discord.com/api/webhooks/456/s3cr3t",
+  };
+
+  // Act
+  const redacted = redactConfigSecrets(config);
+
+  // Assert
+  assert.equal(redacted.DISCORD_WINDOW_WEBHOOK_URL, "[REDACTED]");
+});
+
+test("reads the window notification webhook from the environment", async () => {
+  // Arrange
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.DISCORD_WINDOW_WEBHOOK_URL = "https://discord.com/api/webhooks/7/w";
+
+  try {
+    // Act
+    const config = loadConfig();
+
+    // Assert
+    assert.equal(
+      config.DISCORD_WINDOW_WEBHOOK_URL,
+      "https://discord.com/api/webhooks/7/w",
+    );
+  } finally {
+    delete process.env.DISCORD_WINDOW_WEBHOOK_URL;
+  }
+});

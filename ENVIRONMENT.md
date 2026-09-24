@@ -17,6 +17,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `KEEP_PULSE_ON_FAILURE`      | Boolean | `false`         | Keep container running on auth failures         |
 | `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Pulse at startup to learn the current window    |
 | `DISCORD_WEBHOOK_URL`        | String  | `unset`         | Discord webhook URL for error notifications     |
+| `DISCORD_WINDOW_WEBHOOK_URL` | String  | `unset`         | Discord webhook announcing window reset times   |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | String  | required        | Token from `claude setup-token`                 |
 
 ## Core Configuration
@@ -365,6 +366,26 @@ import('file:///app/src/core/services/notificationService.js').then(m => {
 });
 "
 ```
+
+### `DISCORD_WINDOW_WEBHOOK_URL`
+
+**Purpose:** Announce on Discord when the current usage window resets, so the
+reset time is visible from a phone.
+
+**Type:** String (URL)
+**Default:** Unset (no window announcements)
+
+**Behavior:**
+
+- After each pulse that reports a window, posts "Window open" with the reset
+  time. Discord shows it in each reader's own time zone, with a countdown.
+- When a pulse is refused because the limit is reached, posts "Usage limit
+  reached" with the time the limit lifts.
+- Uses a webhook of its own. Create it in a dedicated channel, then mute or
+  unmute that channel in Discord to turn announcements off and on without
+  touching error alerts.
+- A failed announcement is logged as a warning and never affects pulsing.
+- The URL is masked as `[REDACTED]` in the startup configuration log.
 
 ---
 

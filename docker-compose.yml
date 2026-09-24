@@ -25,8 +25,13 @@ services:
       # Discord webhook for error alerts (optional)
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
 
+      # Discord webhook announcing each window's reset time (optional). Use a
+      # channel of its own, so it can be muted without muting error alerts.
+      - DISCORD_WINDOW_WEBHOOK_URL=${DISCORD_WINDOW_WEBHOOK_URL}
+
       # Token from `claude setup-token`; Claude Code reads it on each pulse.
-      # Prefer an env_file over inline values to keep it out of docker inspect.
+      # An env_file keeps it out of the compose file. Docker still copies its
+      # values into the container config, so docker inspect shows them.
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
     labels:
       - "com.claudepulse.service=claudepulse"

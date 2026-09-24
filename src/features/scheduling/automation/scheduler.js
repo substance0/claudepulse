@@ -91,6 +91,7 @@ export class PulseScheduler {
    * @param {Object} options.executor - Runs a pulse; see ClaudeCliExecutor
    * @param {Object} options.logger - Logger instance
    * @param {Object} options.config - Configuration object
+   * @param {{notify: Function}} [options.notifier] - Announces each pulse's window
    */
   constructor(options = {}) {
     // Validate required dependencies
@@ -106,6 +107,7 @@ export class PulseScheduler {
 
     // Injected dependencies
     this.executor = options.executor;
+    this.notifier = options.notifier;
     this.logger = options.logger.child({
       component: "scheduler",
       intervalHours: options.config.intervalHours || 5,
@@ -283,9 +285,30 @@ export class PulseScheduler {
       this.lastSuccessTime = new Date();
     }
 
+    this._announceWindow(pulseResult);
+
     // An exhausted allowance means Claude is in use, not that ClaudePulse is
     // broken, so callers do not count it as a failure.
     return { ...pulseResult, limitReached: isLimitReached(pulseResult) };
+  }
+
+  /**
+   * Hand a pulse result to the window notifier without waiting on it. A
+   * notification that fails is logged and never affects the pulse.
+   * @param {Object} pulseResult - Result from _sendPulse()
+   */
+  _announceWindow(pulseResult) {
+    if (!this.notifier) {
+      return;
+    }
+
+    Promise.resolve()
+      .then(() => this.notifier.notify(pulseResult))
+      .catch((error) => {
+        this.logger.warn("notify", "Window notification failed", {
+          error: error.message,
+        });
+      });
   }
 
   /**

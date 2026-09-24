@@ -4,7 +4,11 @@
  */
 
 /** Config keys whose values must never reach logs, alerts, or error payloads. */
-const SECRET_CONFIG_KEYS = ["DISCORD_WEBHOOK_URL", "CLAUDE_CODE_OAUTH_TOKEN"];
+const SECRET_CONFIG_KEYS = [
+  "DISCORD_WEBHOOK_URL",
+  "DISCORD_WINDOW_WEBHOOK_URL",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+];
 
 /**
  * Return a copy of the config with secret values masked, for safe logging.
@@ -39,6 +43,7 @@ export const DEFAULT_CONFIG = {
 
   IMMEDIATE_PULSE_AFTER_AUTH: true,
   DISCORD_WEBHOOK_URL: undefined,
+  DISCORD_WINDOW_WEBHOOK_URL: undefined,
 };
 
 /**
@@ -60,6 +65,7 @@ export function parseEnvironmentVariables() {
 
     IMMEDIATE_PULSE_AFTER_AUTH: process.env.IMMEDIATE_PULSE_AFTER_AUTH,
     DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
+    DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
   };
 }
 

@@ -209,6 +209,7 @@ For comprehensive configuration documentation, see [ENVIRONMENT.md](ENVIRONMENT.
 | `MAX_BACKOFF_MINUTES`      | `30`         | Maximum retry delay in minutes       |
 | `NODE_ENV`                 | `production` | Environment mode                     |
 | `DISCORD_WEBHOOK_URL`      | `unset`      | Discord webhook URL for error alerts |
+| `DISCORD_WINDOW_WEBHOOK_URL` | `unset`    | Discord webhook announcing each window's reset time |
 
 ### Discord Notifications (Optional)
 

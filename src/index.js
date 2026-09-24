@@ -8,6 +8,7 @@ import {
   validateConfig,
 } from "./core/config/index.js";
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
+import { createWindowNotifier } from "./core/services/windowNotification.js";
 import { displayBanner } from "./core/utils/banner.js";
 import fs from "fs/promises";
 import path from "path";
@@ -80,11 +81,17 @@ async function runScheduler(config, logger) {
     configDir: pulseConfigDir,
   });
 
-  // 3. Create PulseScheduler with all dependencies
+  // 3. Create PulseScheduler with all dependencies. Window announcements are
+  // sent only when their own webhook is configured.
+  const notifier = config.DISCORD_WINDOW_WEBHOOK_URL
+    ? createWindowNotifier(config.DISCORD_WINDOW_WEBHOOK_URL)
+    : undefined;
+
   const scheduler = new PulseScheduler({
     executor,
     logger,
     config,
+    notifier,
   });
 
   // === End Composition Root ===

@@ -62,12 +62,11 @@ const CALLER_PERMISSIONS = [
   "artifact-metadata: write",
 ];
 
-test("snapshots run only on demand, for amd64", () => {
+test("snapshots run only on demand", () => {
   const text = read("docker-snapshot.yml");
   assert.match(text, /workflow_dispatch/);
   assert.doesNotMatch(text, /^\s*push:/m);
   assert.match(text, /channel: snapshot/);
-  assert.match(text, /platforms: linux\/amd64$/m);
 });
 
 test("edge runs on every push to main", () => {
@@ -162,4 +161,21 @@ test("a newer build never cancels one that is publishing", () => {
     assert.match(text, /cancel-in-progress: false/, name);
     assert.doesNotMatch(text, /cancel-in-progress: true/, name);
   }
+});
+
+test("sets up QEMU before building for other architectures", () => {
+  // BuildKit's built-in emulator crashes the Claude CLI's arm64 binary
+  // (SIGILL) when the install step is not cached.
+  const text = read("docker-build.yml");
+  const qemu = text.indexOf("uses: docker/setup-qemu-action@");
+  const buildx = text.indexOf("uses: docker/setup-buildx-action@");
+  assert.ok(qemu > -1, "setup-qemu-action missing");
+  assert.ok(qemu < buildx, "QEMU must be set up before Buildx");
+});
+
+test("a snapshot can be built for every platform on demand", () => {
+  const text = read("docker-snapshot.yml");
+  assert.match(text, /platforms:\n\s+description:/);
+  assert.match(text, /default: linux\/amd64\n/);
+  assert.match(text, /platforms: \$\{\{ inputs\.platforms \}\}/);
 });

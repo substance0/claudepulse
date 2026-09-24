@@ -176,11 +176,11 @@ gh attestation verify oci://ghcr.io/substance0/claudepulse:<tag> -R substance0/c
 
 | Feature                            | Description                                                                                                                                                                                         |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Smart 5-Hour Cycle Detection**   | Automatically detects Claude Pro/Max 5-hour windows from session history and session limit messages                                                                                                 |
+| **Window-Aware Scheduling**        | Every pulse reports when the current 5-hour window resets; the next pulse lands just after it, so one pulse per window is enough                                                                    |
 | **Docker & Compose Ready**         | One-command deployment; the token is the only state it needs                                                                                                                                        |
 | **Claude Code Authentication**     | Runs Claude Code for each pulse, which authenticates itself from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse stores no credentials                                                                       |
 | **Low-Cost Pulses**                | Each pulse runs the cheapest model with thinking disabled, in an isolated directory and configuration, and keeps the prompt cache warm                                                              |
-| **Intelligent Scheduling**         | Adapts to session limit signals, respects configured hours, tracks session history, or uses reliable defaults ([see strategies details](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
+| **Intelligent Scheduling**         | Follows the reported window, waits out usage limits, respects a configured start hour, and falls back to hourly pulses until a window is known ([see strategies details](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
 | **Immediate First Pulse**          | If the current 5-hour window cannot be detected, sends a pulse at startup to open a new window                                                                                                      |
 | **Intelligent Retry with Backoff** | Exponential backoff (configurable multiplier & max delay) for transient failures; authentication failures are not retried                                                                           |
 | **Spaced Failure Alerts**          | Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so a long outage stays visible without flooding the channel                                                                 |
@@ -219,8 +219,7 @@ Get instant error alerts in Discord by setting up a webhook:
 3. **Add to environment**:
    ```bash
    docker run -d --name claudepulse \
-     -e DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN \
-     -v claudepulse-data:/home/claudepulse/.claude \
+     --env-file claudepulse.env \
      ghcr.io/substance0/claudepulse:latest
    ```
 

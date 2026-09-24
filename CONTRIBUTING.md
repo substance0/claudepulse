@@ -70,10 +70,12 @@ claudepulse/
 ├── assets/                    # Logo and visual assets
 ├── docs/                      # Documentation
 ├── src/                       # Source code
-│   ├── api/                   # Claude Agent SDK integration
-│   ├── automation/            # Scheduling logic
-│   ├── config/                # Configuration
-│   └── utils/                 # Core utilities
+│   ├── core/                  # Configuration, logging, notifications
+│   ├── features/
+│   │   ├── claude/executor/   # Runs Claude Code for each pulse
+│   │   └── scheduling/        # Scheduler and scheduling strategies
+│   └── index.js               # Entry point and composition root
+├── test/                      # Tests (node --test, no dependencies)
 ├── CHANGELOG.md               # Version history
 ├── docker-compose.yml         # Container orchestration
 ├── Dockerfile                 # Container build configuration

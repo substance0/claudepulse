@@ -28,16 +28,9 @@ services:
       # Token from `claude setup-token`; Claude Code reads it on each pulse.
       # Prefer an env_file over inline values to keep it out of docker inspect.
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
-    volumes:
-      # Home directory for Claude Code. Pulses use their own configuration
-      # directory, so nothing here is required for authentication.
-      - claudepulse-data:/home/claudepulse/.claude
     labels:
       - "com.claudepulse.service=claudepulse"
       - "com.claudepulse.description=ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value"
     # Healthcheck comes from the image, which verifies the Claude CLI that
     # pulses run. Defining one here would override it.
     restart: unless-stopped
-
-volumes:
-  claudepulse-data:

@@ -15,7 +15,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `NODE_ENV`                   | String  | `production`    | Environment mode (development/production/test)  |
 | `DRY_RUN`                    | Boolean | `false`         | Test mode - analyze schedule without sending    |
 | `KEEP_PULSE_ON_FAILURE`      | Boolean | `false`         | Keep container running on auth failures         |
-| `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Send discovery pulse after authentication       |
+| `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Pulse at startup to learn the current window    |
 | `DISCORD_WEBHOOK_URL`        | String  | `unset`         | Discord webhook URL for error notifications     |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | String  | required        | Token from `claude setup-token`                 |
 
@@ -23,16 +23,17 @@ Complete reference for ClaudePulse environment variables and configuration optio
 
 ### `SCHEDULED_START_HOUR`
 
-**Purpose:** Sets preferred hour for **first pulse only** when no session history exists.
+**Purpose:** Sets the hour of the **first scheduled pulse only**.
 
 **Type:** Number (0-23)
-**Default:** Unset (falls back to next hour + 10 seconds)
+**Default:** Unset (the first scheduled pulse follows the window, or the next hour)
 
 **Behavior:**
 
-- Only affects initial scheduling when starting fresh
-- First pulse scheduled at `SCHEDULED_START_HOUR:00:10` local time
-- Subsequent pulses use other strategies (cycle limit signals, session tracking, or 5-hour fixed intervals)
+- First scheduled pulse at `SCHEDULED_START_HOUR:00:10` local time
+- Takes precedence over the reported window for that first pulse only, because
+  it is explicit configuration
+- Every later pulse follows the window reset (see Pulse Scheduling below)
 - This is NOT a daily anchor - one-time use only
 
 **Example:**
@@ -64,21 +65,25 @@ PROMPT_TEXT="ok"            # Ultra-minimal
 
 ---
 
-### Pulse Interval Behavior
+### Pulse Scheduling
 
 **IMPORTANT:** ClaudePulse does **not** use a configurable `INTERVAL_HOURS` variable.
 
-The pulse interval is determined automatically by the scheduling strategy:
+Every pulse reports the rate-limit window it ran in, including when that window
+resets, as a timestamp. The next pulse is scheduled from it:
 
-| Mode           | Interval | When Used                                |
-| -------------- | -------- | ---------------------------------------- |
-| Discovery Mode | 1 hour   | No cycle limit detected yet              |
-| Normal Mode    | 5 hours  | After first cycle limit message received |
+| Last pulse                         | Next pulse                                  |
+| ---------------------------------- | ------------------------------------------- |
+| Allowed                            | 10 seconds after the 5-hour window resets   |
+| Usage limit reached                | 10 seconds after the blocking window resets |
+| Reported no window (e.g. it failed)| On the next hour, to learn the window       |
 
-This adaptive behavior ensures:
+A single successful pulse is enough to learn the window, so in normal operation
+ClaudePulse pulses once per window. Reset times are used as reported, not
+rounded to the hour: windows do not start on the hour.
 
-- Fast discovery of current session state (1-hour probes)
-- Efficient operation once session windows are known (5-hour intervals)
+A pulse refused because the usage limit is reached is not a failure: Claude is
+in use. It is not retried and raises no alert.
 
 See [Scheduling Strategies](docs/workflow-diagrams.md#3-scheduling-strategy-selection) for details.
 
@@ -252,7 +257,7 @@ KEEP_PULSE_ON_FAILURE=true
 
 ### `IMMEDIATE_PULSE_AFTER_AUTH`
 
-**Purpose:** Send discovery pulse immediately after authentication.
+**Purpose:** Send a pulse at startup to learn the current window.
 
 **Type:** Boolean
 **Default:** `true`
@@ -263,7 +268,9 @@ KEEP_PULSE_ON_FAILURE=true
 - `true` (default): Send a pulse at startup to discover current session state
 - `false`: Wait for first scheduled time
 
-**Use Case:** Helps quickly establish current 5-hour window boundaries.
+**Use Case:** The startup pulse reports when the current window resets, so
+the first scheduled pulse can follow it. A startup pulse that fails raises an
+alert, which surfaces a bad token as soon as the container starts.
 
 ---
 
@@ -381,7 +388,8 @@ TZ=Australia/Sydney
 - Use IANA identifiers (not UTC offsets) for automatic DST handling
 - ✅ Good: `TZ=America/New_York` (handles DST)
 - ❌ Bad: `TZ=UTC-5` (no DST adjustment)
-- Container timezone must match your local timezone for correct cycle limit parsing
+- `TZ` sets log timestamps and the hour `SCHEDULED_START_HOUR` refers to.
+  Window reset times arrive as timestamps, so scheduling does not depend on it.
 
 ---
 
@@ -395,14 +403,17 @@ docker run -d --name claudepulse \
   -e LOG_LEVEL=INFO \
   -e MAX_RETRIES=3 \
   -e PROMPT_TEXT="ping" \
-  -v ${HOME}/.claude:/home/claudepulse/.claude \
+  --env-file claudepulse.env \
   ghcr.io/substance0/claudepulse:latest
 ```
+
+`claudepulse.env` holds `CLAUDE_CODE_OAUTH_TOKEN`. No volume is needed:
+ClaudePulse keeps no state between restarts, and the startup pulse learns the
+current window again.
 
 ### Docker Compose
 
 ```yaml
-version: "3.8"
 services:
   claudepulse:
     image: ghcr.io/substance0/claudepulse:latest
@@ -412,28 +423,27 @@ services:
       - MAX_RETRIES=3
       - PROMPT_TEXT=ping
       - NODE_ENV=production
-    volumes:
-      - ${HOME}/.claude:/home/claudepulse/.claude
+    env_file:
+      - claudepulse.env # CLAUDE_CODE_OAUTH_TOKEN=...
+    restart: unless-stopped
 ```
 
 ---
 
 ## Troubleshooting
 
-### Cycle Limit Timing Issues
+### Pulses Not Following the Window
 
-**Symptoms:** Pulses sent at wrong times
-**Solution:**
+**Symptoms:** Pulses every hour instead of once per window
+**Solution:** Hourly pulses mean no pulse has reported a window, usually
+because pulses are failing.
 
 ```bash
-# Verify container timezone:
-docker exec claudepulse date
+# Which strategy scheduled the next pulse (window_reset is normal):
+docker logs claudepulse | grep -i "Strategy selected"
 
-# Set correct timezone:
-docker run -e TZ=America/New_York claudepulse
-
-# Check cycle limit detection:
-docker logs claudepulse | grep -i "cycle limit\|reset"
+# Whether pulses report a window reset:
+docker logs claudepulse | grep -i "windowResetsAt\|Pulse failed"
 ```
 
 ---
@@ -483,23 +493,10 @@ MAX_BACKOFF_MINUTES=60
 RETRY_BACKOFF_MULTIPLIER=2
 ```
 
-### 3. Timezone Accuracy
+### 3. Readable Timestamps
 
-Always set `TZ` to match your location for correct cycle limit parsing.
-
----
-
-## Advanced/Debug Variables
-
-These variables are primarily for development and debugging:
-
-| Variable                            | Type   | Purpose                             |
-| ----------------------------------- | ------ | ----------------------------------- |
-| `SESSION_LIMIT_TIME_REGEX`          | String | Custom regex for parsing reset time |
-| `MOCK_CLAUDE_SESSION_LIMIT_MESSAGE` | String | Simulate cycle limit error          |
-| `MOCK_CLAUDE_PING_SUCCESS_MESSAGE`  | String | Simulate successful pulse           |
-
-**Note:** These are not recommended for production use.
+Set `TZ` to your location so log timestamps and `SCHEDULED_START_HOUR` use your
+local time.
 
 ---
 
@@ -507,13 +504,14 @@ These variables are primarily for development and debugging:
 
 ClaudePulse uses priority-based scheduling:
 
-| Priority | Strategy        | Trigger                      | Next Run Time             |
-| -------- | --------------- | ---------------------------- | ------------------------- |
-| 1        | External Signal | Cycle limit message detected | Reset time + 10sec        |
-| 2        | Initial Hour    | `SCHEDULED_START_HOUR` set   | Hour + 10sec (first only) |
-| 3        | Session Expiry  | Active session detected      | Window end + 10sec        |
-| 4        | Fixed Cadence   | Has previous schedule        | Last + 5 hours            |
-| 5        | Discovery       | Fallback                     | Next hour + 10sec         |
+| Priority | Strategy          | Trigger                                 | Next Run Time                   |
+| -------- | ----------------- | --------------------------------------- | ------------------------------- |
+| 1        | `scheduled_start` | `SCHEDULED_START_HOUR` set, first only  | Configured hour + 10sec         |
+| 2        | `window_reset`    | Last pulse reported a window            | Window reset + 10sec            |
+| 3        | `discovery`       | No window known (e.g. a failed pulse)   | Next hour + 10sec               |
+
+`window_reset` uses the 5-hour reset after an allowed pulse, and the blocking
+window's reset after a pulse refused at the usage limit.
 
 **All schedules include a 10-second buffer** to ensure pulses occur after time boundaries.
 

@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - main # Only trigger on main branch (develop pushes won't trigger this)
+      - main
 
 permissions:
   contents: write
@@ -13,6 +13,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.released.outputs.tag }}
+      version: ${{ steps.released.outputs.version }}
 
     steps:
       - name: Checkout
@@ -35,57 +38,28 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
 
-      # ============================================================================
-      # Sync Release Changes to Develop Branch
-      # ============================================================================
-      # After semantic-release creates version bump commits and updates CHANGELOG.md
-      # on main, we merge those changes back into develop to keep branches synchronized.
-      #
-      # Strategy (Team-Friendly):
-      # - Merge main into develop (preserves history, no force-push needed)
-      # - Uses -X theirs for conflicts in version files (package.json, CHANGELOG.md)
-      # - Safe for teams: doesn't rewrite history or break feature branches
-      # - Workflow fails if conflicts can't be auto-resolved
-      #
-      # Why merge instead of rebase?
-      # - No force-push required → doesn't break developers' feature branches
-      # - Preserves commit history → easier to track changes
-      # - GitHub-friendly → works well with PR workflows
-      # ============================================================================
-      - name: Sync release to develop branch
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # semantic-release leaves HEAD on the release commit it tagged, or on
+      # the unchanged commit when there was nothing to release. The image
+      # build keys off this rather than off a release event: events created
+      # with GITHUB_TOKEN start no other workflows.
+      - name: Detect new release
+        id: released
         run: |
-          # Configure git with GitHub Actions bot identity
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          tag="$(git tag --points-at HEAD --list 'v[0-9]*' | head -n1)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
-          # Configure git to use GITHUB_TOKEN for authentication
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-
-          # Fetch all branches to ensure we have latest state
-          git fetch origin main develop
-
-          # Check if develop branch exists
-          if ! git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
-            echo "⚠️  Develop branch does not exist, skipping sync"
-            exit 0
-          fi
-
-          # Checkout develop branch
-          git checkout develop
-          git pull origin develop
-
-          # Merge main into develop
-          echo "🔄 Merging main into develop..."
-
-          # Use -X theirs strategy to prefer main's changes for version conflicts
-          # This ensures version bumps from main take precedence
-          # Note: No [skip ci] needed - this workflow only triggers on main branch
-          git merge origin/main -X theirs --no-edit -m "chore: sync release changes from main"
-
-          # Push the merged develop branch (regular push, no force needed)
-          git push origin develop
-
-          echo "✅ Successfully synced release changes to develop branch"
+  image:
+    needs: release
+    if: needs.release.outputs.tag != ''
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      channel: release
+      ref: ${{ needs.release.outputs.tag }}
+      version: ${{ needs.release.outputs.version }}

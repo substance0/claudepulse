@@ -177,6 +177,27 @@ npm run oauth-verify <verification_code>
 
 </details>
 
+## Release Channels
+
+| Tag                           | Published                  | Use                         |
+| ----------------------------- | -------------------------- | --------------------------- |
+| `latest`, `X.Y.Z`, `X.Y`, `X` | when a release is cut      | production                  |
+| `edge`, `X.Y.Z-dev.N`         | every commit on `main`     | early access to merged work |
+| `snapshot-<branch>`           | on demand, from any branch | testing a branch            |
+| `sha-<commit>`                | every build                | pinning an exact build      |
+
+Build a snapshot of a branch:
+
+```bash
+gh workflow run docker-snapshot.yml --ref <branch>
+```
+
+Every image carries build provenance. Verify one with:
+
+```bash
+gh attestation verify oci://ghcr.io/substance0/claudepulse:<tag> -R substance0/claudepulse
+```
+
 ## Features
 
 | Feature                            | Description                                                                                                                                                                                         |

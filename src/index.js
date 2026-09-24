@@ -7,8 +7,6 @@ import {
   redactConfigSecrets,
   validateConfig,
 } from "./core/config/index.js";
-import SessionTracker from "./features/claude/session/SessionTracker.js";
-import ClaudeLogReader from "./features/claude/ClaudeLogReader.js";
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
 import { displayBanner } from "./core/utils/banner.js";
 import fs from "fs/promises";
@@ -85,21 +83,9 @@ async function runScheduler(config, logger) {
     configDir: pulseConfigDir,
   });
 
-  // 3. Create ClaudeLogReader for SessionTracker
-  const logReaderLogger = logger.child({ component: "log-reader" });
-  const logReader = new ClaudeLogReader({
-    logger: logReaderLogger,
-  });
-
-  // 4. Create SessionTracker with ClaudeLogReader
-  const sessionTracker = new SessionTracker({
-    logReader,
-  });
-
-  // 5. Create PulseScheduler with all dependencies
+  // 3. Create PulseScheduler with all dependencies
   const scheduler = new PulseScheduler({
     executor,
-    sessionTracker,
     logger,
     config,
   });
@@ -189,23 +175,6 @@ async function main() {
       "config",
       `Local timezone: ${timezoneIANA} (${timezoneName}, ${offsetStr}) - all timestamps will be displayed in local time with UTC offset`,
     );
-
-    // Warn if mock modes are enabled
-    const mockSessionLimit = process.env.MOCK_CLAUDE_SESSION_LIMIT_MESSAGE;
-    if (mockSessionLimit) {
-      logger.warn(
-        "config",
-        `Mock mode enabled: Simulating session limit error response (MOCK_CLAUDE_SESSION_LIMIT_MESSAGE="${mockSessionLimit}")`,
-      );
-    }
-
-    const mockPingSuccess = process.env.MOCK_CLAUDE_PING_SUCCESS_MESSAGE;
-    if (mockPingSuccess) {
-      logger.warn(
-        "config",
-        `Mock mode enabled: Simulating successful ping response (MOCK_CLAUDE_PING_SUCCESS_MESSAGE="${mockPingSuccess}")`,
-      );
-    }
 
     const result = await runScheduler(config, logger);
 

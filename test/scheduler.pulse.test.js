@@ -18,7 +18,6 @@ const NOOP_LOGGER = {
 function buildScheduler(pulseImpl) {
   return new PulseScheduler({
     executor: { pulse: pulseImpl },
-    sessionTracker: { registerSessionLimitSignal() {} },
     logger: NOOP_LOGGER,
     config: { PROMPT_TEXT: "pulse check", MAX_RETRIES: 3 },
   });

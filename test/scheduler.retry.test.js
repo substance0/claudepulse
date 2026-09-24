@@ -58,10 +58,6 @@ const TRANSIENT_ERROR = JSON.stringify({
 function buildScheduler({ pulseError }) {
   const scheduler = new PulseScheduler({
     executor: { pulse: async () => ({}) },
-    sessionTracker: {
-      registerSessionLimitSignal() {},
-      getSessionInfo: () => ({}),
-    },
     logger: NOOP_LOGGER,
     config: { MAX_RETRIES: 3, PROMPT_TEXT: "pulse check" },
   });

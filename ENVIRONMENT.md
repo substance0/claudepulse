@@ -17,6 +17,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `KEEP_PULSE_ON_FAILURE`      | Boolean | `false`         | Keep container running on auth failures         |
 | `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Send discovery pulse after authentication       |
 | `DISCORD_WEBHOOK_URL`        | String  | `unset`         | Discord webhook URL for error notifications     |
+| `CLAUDE_CODE_OAUTH_TOKEN`    | String  | required        | Token from `claude setup-token`                 |
 
 ## Core Configuration
 
@@ -259,7 +260,7 @@ KEEP_PULSE_ON_FAILURE=true
 
 **Behavior:**
 
-- `true` (default): Send pulse right after OAuth to discover current session state
+- `true` (default): Send a pulse at startup to discover current session state
 - `false`: Wait for first scheduled time
 
 **Use Case:** Helps quickly establish current 5-hour window boundaries.
@@ -268,26 +269,33 @@ KEEP_PULSE_ON_FAILURE=true
 
 ## Authentication Configuration
 
-### OAuth Credentials Path
+### `CLAUDE_CODE_OAUTH_TOKEN`
 
-**Default:** `~/.claude/.credentials.json`
+**Type:** String
+**Default:** `unset` (required)
 
-ClaudePulse uses credentials from Claude Code CLI. Customize path via Docker volume mounts:
+ClaudePulse does not manage credentials. Each pulse runs Claude Code as a
+subprocess, which reads this variable and authenticates itself.
 
-**Docker:**
+Generate the token on a machine with a browser:
 
 ```bash
-docker run -v /custom/path:/home/claudepulse/.claude claudepulse
+claude setup-token
 ```
 
-**Authentication Flow:**
+The command prints the token once and saves it nowhere. It is valid for one
+year. Supply it from a file rather than inline, so it stays out of shell
+history, `docker inspect` output and stack listings:
 
-1. Pre-auth recommended: `claude /login`
-2. Or, ClaudePulse displays OAuth URL in logs
-3. Complete browser auth
-4. Pass verification code: `npm run oauth-verify <code>`
+```yaml
+services:
+  claudepulse:
+    env_file:
+      - /path/to/claudepulse.env # CLAUDE_CODE_OAUTH_TOKEN=...
+```
 
----
+The token is not validated at startup. An expired or rejected one surfaces as
+a failed pulse, which is reported without retrying (see `MAX_RETRIES`).
 
 ---
 

@@ -1,5 +1,5 @@
 # ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value
-# Node.js application with OAuth authentication and Claude Agent SDK
+# Node.js scheduler that runs the Claude Code CLI for each pulse
 
 FROM node:20-alpine
 
@@ -8,7 +8,7 @@ ARG VERSION=unknown
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 
-# Install runtime dependencies including Claude CLI (required by SDK)
+# Install runtime dependencies, including the Claude CLI that pulses run
 RUN apk add --no-cache \
     tini \
     && npm install -g @anthropic-ai/claude-code \
@@ -38,7 +38,7 @@ RUN chown -R claudepulse:claudepulse /app && \
 # Switch to non-root user
 USER claudepulse
 
-# Create .claude directory for credentials with proper permissions
+# Create the Claude Code home directory with restrictive permissions
 RUN mkdir -p /home/claudepulse/.claude && \
     chmod 700 /home/claudepulse/.claude
 
@@ -53,7 +53,7 @@ ENV NODE_ENV=production \
     DRY_RUN=false \
     NPM_CONFIG_UPDATE_NOTIFIER=false
 
-# Health check that verifies Node.js app and Claude CLI availability (required by SDK)
+# Health check that verifies Node.js and the Claude CLI are available
 HEALTHCHECK --interval=5m --timeout=30s --start-period=30s --retries=3 \
     CMD node -e "console.log('Node.js OK')" && claude --version > /dev/null || exit 1
 

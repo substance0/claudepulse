@@ -40,29 +40,27 @@ Here's the thing: Claude Code's 5-hour windows don't reset automatically when th
 <details open>
 <summary><strong>🐳 Docker Registry (Recommended)</strong></summary>
 
+**Authentication (once):** ClaudePulse runs Claude Code for each pulse, and Claude Code authenticates itself. Generate a long-lived token on any machine with a browser:
+
 ```bash
-docker run -d --name claudepulse -e TZ=America/New_York -v claudepulse-data:/home/claudepulse/.claude ghcr.io/substance0/claudepulse:latest
+claude setup-token
 ```
+
+It prints the token once and saves it nowhere. Store it in an env file, readable only by you:
+
+```bash
+echo "CLAUDE_CODE_OAUTH_TOKEN=<token>" > claudepulse.env && chmod 600 claudepulse.env
+```
+
+**Run:**
+
+```bash
+docker run -d --name claudepulse -e TZ=America/New_York --env-file claudepulse.env ghcr.io/substance0/claudepulse:latest
+```
+
+Passing the token through `--env-file` keeps it out of your shell history. The token is valid for one year.
 
 **💡 Timezone (Optional):** Set the `TZ` environment variable to your local timezone for better log readability. Replace `America/New_York` with your timezone (e.g., `Europe/London`, `Asia/Tokyo`). Default is `UTC`. [Find your timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
-
----
-
-**Authentication:**
-
-```bash
-# If you haven't pre-authenticated using 'claude /login' command:
-# ClaudePulse will display an OAuth authorization URL in the logs
-docker logs claudepulse
-
-# Open the OAuth URL in your browser to authenticate
-# Once authenticated, pass the verification code to complete authentication:
-docker exec -it claudepulse npm run oauth-verify <verification_code>
-
-# ClaudePulse will now automatically send pulse messages based on the detected scheduled strategy.
-```
-
-Authentication will persist between container restarts using the `claudepulse-data` Docker volume.
 
 **Stopping ClaudePulse:**
 
@@ -98,23 +96,7 @@ docker-compose up -d
 
 **💡 Timezone (Optional):** Edit `docker-compose.yml` to set the `TZ` environment variable to your local timezone for better log readability. Default is `UTC`.
 
----
-
-**Authentication:**
-
-```bash
-# If you haven't pre-authenticated using 'claude /login' command:
-# ClaudePulse will display an OAuth authorization URL in the logs
-docker logs claudepulse
-
-# Open the OAuth URL in your browser to authenticate
-# Once authenticated, pass the verification code to complete authentication:
-docker exec -it claudepulse npm run oauth-verify <verification_code>
-
-# ClaudePulse will now automatically send pulse messages based on the detected scheduled strategy.
-```
-
-Authentication will persist between container restarts using the `claudepulse-data` Docker volume.
+**Authentication:** export `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`, see above) in the shell that runs `docker-compose up`, or reference an env file from the service with `env_file:`.
 
 **Stopping ClaudePulse:**
 
@@ -159,21 +141,7 @@ docker logs claudepulse-dev
 
 ---
 
-**Authentication:**
-
-**💡 Recommended:** Pre-authenticate with Claude CLI (`claude /login`) before running ClaudePulse. This allows ClaudePulse to reuse existing credentials automatically.
-
-If not pre-authenticated, ClaudePulse will handle OAuth flow:
-
-```bash
-# ClaudePulse will display an OAuth authorization URL in the logs
-# Open the OAuth URL in your browser to authenticate
-
-# Once authenticated, pass the verification code to complete authentication:
-npm run oauth-verify <verification_code>
-
-# ClaudePulse will now automatically send pulse messages
-```
+**Authentication:** requires the Claude CLI on your `PATH`. Export `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` before `npm start`.
 
 </details>
 
@@ -209,13 +177,14 @@ gh attestation verify oci://ghcr.io/substance0/claudepulse:<tag> -R substance0/c
 | Feature                            | Description                                                                                                                                                                                         |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Smart 5-Hour Cycle Detection**   | Automatically detects Claude Pro/Max 5-hour windows from session history and session limit messages                                                                                                 |
-| **Docker & Compose Ready**         | One-command deployment with volume persistence for authentication credentials                                                                                                                       |
-| **OAuth 2.0 with PKCE**            | Secure authentication flow with browser-based authorization and verification code exchange                                                                                                          |
-| **Credential Auto-Detection**      | Watches for credential changes during startup and automatically resumes when authentication completes                                                                                               |
+| **Docker & Compose Ready**         | One-command deployment; the token is the only state it needs                                                                                                                                        |
+| **Claude Code Authentication**     | Runs Claude Code for each pulse, which authenticates itself from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse stores no credentials                                                                       |
+| **Low-Cost Pulses**                | Each pulse runs the cheapest model with thinking disabled, in an isolated directory and configuration, and keeps the prompt cache warm                                                              |
 | **Intelligent Scheduling**         | Adapts to session limit signals, respects configured hours, tracks session history, or uses reliable defaults ([see strategies details](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
-| **Immediate Post-Auth Pulse**      | If the current 5-hour window cannot be detected, sends verification pulse immediately after OAuth completion to confirm connection and trigger new 5h window                                        |
-| **Intelligent Retry with Backoff** | Exponential backoff (configurable multiplier & max delay) with automatic session limit handling                                                                                                     |
-| **Minimal Dependencies**           | Only depends on official Anthropic Claude Agent SDK - no unnecessary bloat                                                                                                                          |
+| **Immediate First Pulse**          | If the current 5-hour window cannot be detected, sends a pulse at startup to open a new window                                                                                                      |
+| **Intelligent Retry with Backoff** | Exponential backoff (configurable multiplier & max delay) for transient failures; authentication failures are not retried                                                                           |
+| **Spaced Failure Alerts**          | Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so a long outage stays visible without flooding the channel                                                                 |
+| **No Runtime Dependencies**        | No npm runtime dependencies; relies on the Claude CLI included in the image                                                                                                                         |
 
 ## Configuration
 

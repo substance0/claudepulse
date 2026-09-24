@@ -308,19 +308,26 @@ export class Logger {
         }
         return "";
 
-      case "pulse":
-        if (data.success !== undefined) {
-          if (data.success) {
-            return "success";
-          } else {
-            // Include error details for failed pulses
-            const parts = ["failed"];
-            if (data.error) parts.push(`error="${data.error}"`);
-            if (data.sessionLimitReached) parts.push("session_limited=true");
-            return parts.join(", ");
-          }
+      case "pulse": {
+        const parts = [];
+        if (data.success === true) parts.push("success");
+        if (data.success === false) parts.push("failed");
+        // Shown whenever present: failures are logged without a success flag,
+        // and the error is what explains an outage.
+        if (data.error) parts.push(`error="${data.error}"`);
+        if (data.windowResetsAt) {
+          parts.push(
+            `window_resets=${DateUtility.formatLocalIso(new Date(data.windowResetsAt))}`,
+          );
         }
-        return "";
+        if (data.resetsAt) {
+          parts.push(
+            `resets=${DateUtility.formatLocalIso(new Date(data.resetsAt))}`,
+          );
+        }
+        if (data.cost !== undefined) parts.push(`cost=${data.cost}`);
+        return parts.join(", ");
+      }
 
       case "ready":
         return "";

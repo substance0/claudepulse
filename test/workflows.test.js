@@ -116,3 +116,50 @@ test("the release image is built from the tagged release commit", () => {
 test("release no longer syncs to the retired develop branch", () => {
   assert.doesNotMatch(read("release.yml"), /develop/);
 });
+
+// node --test expands globs only from Node 21 on.
+const nodeMajors = (text) =>
+  [...text.matchAll(/node-version: "(\d+)\.x"/g)].map((m) => Number(m[1]));
+
+test("every workflow that runs npm test uses a Node that expands test globs", () => {
+  for (const name of ["docker-build.yml", "release.yml"]) {
+    const majors = nodeMajors(read(name));
+    assert.ok(majors.length > 0, name);
+    for (const major of majors) assert.ok(major >= 22, `${name}: node ${major}`);
+  }
+});
+
+test("a red test suite stops the release before it is cut", () => {
+  const text = read("release.yml");
+  const test = text.indexOf("run: npm test");
+  const release = text.indexOf("run: npx semantic-release");
+  assert.ok(test > -1 && test < release);
+});
+
+test("a published release can be rebuilt from its tag", () => {
+  const text = read("docker-release-rebuild.yml");
+  assert.match(text, /workflow_dispatch/);
+  assert.match(text, /tag:/);
+  assert.match(text, /channel: release/);
+  assert.match(text, /ref: \$\{\{ inputs\.tag \}\}/);
+  assert.match(text, /git rev-parse --verify/);
+  for (const permission of CALLER_PERMISSIONS) {
+    assert.match(text, new RegExp(permission), permission);
+  }
+});
+
+test("snapshots never overwrite the sha tag of another channel", () => {
+  assert.match(
+    read("docker-build.yml"),
+    /type=raw,value=sha-\$\{\{ steps\.version\.outputs\.short \}\},enable=\$\{\{ inputs\.channel != 'snapshot' \}\}/,
+  );
+});
+
+test("a newer build never cancels one that is publishing", () => {
+  for (const name of ["docker-edge.yml", "docker-snapshot.yml"]) {
+    const text = read(name);
+    assert.match(text, /concurrency:/, name);
+    assert.match(text, /cancel-in-progress: false/, name);
+    assert.doesNotMatch(text, /cancel-in-progress: true/, name);
+  }
+});

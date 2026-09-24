@@ -163,6 +163,95 @@ LSP, plugin…"*. It is a trap. The documentation states:
 It would silently break subscription authentication, the one thing this design
 depends on.
 
+## Scheduling from rate-limit events
+
+### What the scheduler used to rely on
+
+Scheduling depended on learning when the 5-hour window resets, from two
+sources:
+
+- **Limit messages**, parsed by regex. The parser requires `limit reached` and
+  a bare `resets <time>`. It recognises none of the formats Claude Code has
+  actually shipped:
+
+  | Message                                                          | Source        | Parsed |
+  | ---------------------------------------------------------------- | ------------- | ------ |
+  | `You've hit your session limit · resets 3:45pm`                  | current docs  | no     |
+  | `You've hit your weekly limit · resets Mon 12:00am`              | current docs  | no     |
+  | `Claude usage limit reached. Your limit will reset at 5pm (America/Chicago).` | 2025 issue | no |
+  | `Claude AI usage limit reached\|1754298000`                      | 2025 issues   | no     |
+  | `5-hour limit reached ∙ resets 2pm`                              | its own mock  | yes    |
+
+  Only its own test fixture passed. Limit messages also appear only once the
+  account is already blocked.
+- **Claude Code's project logs**, scanned under `~/.claude/projects`. Pulses
+  now run with `--no-session-persistence` and a pinned configuration directory,
+  so there are no logs to scan.
+
+With neither source working, the scheduler never left discovery mode and pulsed
+hourly indefinitely. That matches the production logs.
+
+### The structured source
+
+`claude -p --output-format stream-json --verbose` emits a `rate_limit_event`
+(documented as `SDKRateLimitEvent` in the Agent SDK reference). It arrives on
+**every** call, not only when blocked. Captured from a successful pulse on
+2026-09-24:
+
+```json
+{
+  "status": "allowed",
+  "resetsAt": 1790257800,
+  "rateLimitType": "five_hour",
+  "unifiedWindows": {
+    "five_hour": { "utilization": 0.48, "resetsAt": 1790257800 },
+    "seven_day": { "utilization": 0.2, "resetsAt": 1790416800 }
+  }
+}
+```
+
+`resetsAt` is epoch seconds, so no wording, locale or timezone is involved. The
+documented fields are `status` (`allowed`, `allowed_warning`, `rejected`),
+`resetsAt` and `utilization`. `rateLimitType` and `unifiedWindows` appear in real
+output but not in the documented type, so they are read when present and never
+required.
+
+### Next pulse time
+
+| Pulse outcome                     | Next pulse                                              |
+| --------------------------------- | ------------------------------------------------------- |
+| `allowed` / `allowed_warning`     | 5-hour window reset + 10 s                              |
+| `rejected`                        | reset of the blocking window (`resetsAt`) + 10 s        |
+| no event (failed pulse, dry run)  | next hour + 10 s (discovery fallback)                   |
+
+The 5-hour reset is `unifiedWindows.five_hour.resetsAt` when present, otherwise
+`resetsAt` when `rateLimitType` is `five_hour` or absent. When rejected, the
+top-level `resetsAt` is used whatever the window, because that is when requests
+are accepted again.
+
+Times are **not** aligned to the hour. The measured window reset at 15:50:00;
+rounding up to 16:00:10 would waste ten minutes of every window.
+
+### Decisions
+
+- **A rejected pulse is not a failure.** It means the allowance is in use, not
+  that ClaudePulse is broken. It is not retried, does not increment the failure
+  count, and raises no alert. The next pulse goes to the reset time.
+- **A configured `SCHEDULED_START_HOUR` outranks the window** for the first
+  scheduled pulse only. It is explicit user intent. Every later pulse follows the
+  window.
+
+### Removed
+
+- `ResetSignalStrategy`, `ActiveCycleStrategy`, `CruiseStrategy`, replaced by a
+  single strategy driven by the event
+- `SessionLimitParser`, `SESSION_LIMIT_TIME_REGEX`, `ClaudeLogReader`,
+  `ProjectLogAggregator`, `CycleComputer`, `SessionTracker`
+- `MOCK_CLAUDE_SESSION_LIMIT_MESSAGE` and `MOCK_CLAUDE_PING_SUCCESS_MESSAGE`,
+  whose consumer was removed with the SDK chain; since then they only log a
+  warning
+- The `claudepulse-data` volume, which nothing reads or writes
+
 ## Failure handling
 
 `claude -p` exits non-zero on failure. The exit code and stderr replace the SDK

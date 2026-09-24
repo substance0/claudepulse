@@ -30,6 +30,71 @@ function isAuthFailure(text) {
 }
 
 /**
+ * Parse `--output-format stream-json` output into its JSON lines.
+ * Lines that are not JSON are skipped rather than failing the whole parse.
+ * @param {string} stdout - Raw subprocess output
+ * @returns {Object[]} Parsed lines, in order
+ */
+function parseJsonLines(stdout) {
+  const lines = [];
+
+  for (const line of (stdout || "").split("\n")) {
+    if (!line.trim()) {
+      continue;
+    }
+    try {
+      lines.push(JSON.parse(line));
+    } catch {
+      // A stray non-JSON line (a shell warning, say) carries nothing we use.
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * Convert an epoch-seconds value to a Date.
+ * @param {number|undefined} seconds
+ * @returns {Date|null}
+ */
+function fromEpochSeconds(seconds) {
+  return Number.isFinite(seconds) ? new Date(seconds * 1000) : null;
+}
+
+/**
+ * Extract the rate-limit state from the last rate_limit_event in a stream.
+ *
+ * Only `status`, `resetsAt` and `utilization` are documented. `rateLimitType`
+ * and `unifiedWindows` appear in real output but are not, so they are read
+ * when present and never required.
+ * @param {Object[]} lines - Parsed stream lines
+ * @returns {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null}|null}
+ */
+function extractRateLimit(lines) {
+  const event = lines
+    .filter((line) => line.type === "rate_limit_event")
+    .at(-1);
+
+  const info = event?.rate_limit_info;
+  if (!info) {
+    return null;
+  }
+
+  // resetsAt names the 5-hour window only when the event says so, or says
+  // nothing about which window it describes.
+  const resetsAtIsFiveHour =
+    info.rateLimitType === undefined || info.rateLimitType === "five_hour";
+
+  return {
+    status: info.status,
+    resetsAt: fromEpochSeconds(info.resetsAt),
+    fiveHourResetsAt:
+      fromEpochSeconds(info.unifiedWindows?.five_hour?.resetsAt) ??
+      (resetsAtIsFiveHour ? fromEpochSeconds(info.resetsAt) : null),
+  };
+}
+
+/**
  * Runs Claude Code as a subprocess to open a session window.
  *
  * The argument list is deliberately fixed. Two omissions are load-bearing:
@@ -124,8 +189,12 @@ export class ClaudeCliExecutor {
       "--settings",
       "{}",
       "--no-session-persistence",
+      // stream-json carries the rate_limit_event, which reports when the
+      // 5-hour window resets. The CLI rejects it in print mode without
+      // --verbose.
       "--output-format",
-      "json",
+      "stream-json",
+      "--verbose",
     ];
   }
 
@@ -135,34 +204,32 @@ export class ClaudeCliExecutor {
    * @param {string} raw.stdout - Standard output, expected to hold JSON
    * @param {string} raw.stderr - Standard error
    * @param {number} raw.exitCode - Process exit code
-   * @returns {{success: boolean, authFailure: boolean, message?: Object, error?: string}}
+   * @returns {{success: boolean, authFailure: boolean, rateLimit: Object|null, message?: Object, error?: string}}
    */
   static parseResult({ stdout, stderr, exitCode }) {
-    let parsed = null;
+    const lines = parseJsonLines(stdout);
+    const result = lines.filter((line) => line.type === "result").at(-1);
+    const rateLimit = extractRateLimit(lines);
 
-    try {
-      parsed = JSON.parse(stdout);
-    } catch {
-      parsed = null;
-    }
-
-    if (parsed && !parsed.is_error && exitCode === 0) {
+    if (result && !result.is_error && exitCode === 0) {
       return {
         success: true,
         authFailure: false,
+        rateLimit,
         message: {
-          total_cost_usd: parsed.total_cost_usd,
-          duration_ms: parsed.duration_ms,
-          session_id: parsed.session_id,
+          total_cost_usd: result.total_cost_usd,
+          duration_ms: result.duration_ms,
+          session_id: result.session_id,
         },
       };
     }
 
-    const detail = parsed?.result || stderr || "Claude CLI failed";
+    const detail = result?.result || stderr || "Claude CLI failed";
 
     return {
       success: false,
       authFailure: isAuthFailure(detail),
+      rateLimit,
       error: detail,
     };
   }

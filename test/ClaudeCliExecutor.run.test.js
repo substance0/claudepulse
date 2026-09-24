@@ -37,6 +37,7 @@ test("returns a successful result from the CLI's JSON output", async () => {
   const stub = await writeStub(
     dir,
     JSON.stringify({
+      type: "result",
       is_error: false,
       result: "ok",
       session_id: "s-1",

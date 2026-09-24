@@ -10,10 +10,15 @@ test("requests the cheap model", () => {
   assert.equal(args[i + 1], "haiku");
 });
 
-test("requests machine-readable output", () => {
+test("requests streamed output, which carries the rate-limit event", () => {
   const args = ClaudeCliExecutor.buildArgs("pulse check");
   const i = args.indexOf("--output-format");
-  assert.equal(args[i + 1], "json");
+  assert.equal(args[i + 1], "stream-json");
+});
+
+test("passes --verbose, without which the CLI rejects stream-json in print mode", () => {
+  const args = ClaudeCliExecutor.buildArgs("pulse check");
+  assert.ok(args.includes("--verbose"));
 });
 
 test("excludes MCP servers, user settings and session files", () => {

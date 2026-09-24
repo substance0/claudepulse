@@ -799,3 +799,89 @@ The four retained fixes are already implemented on this branch and are untouched
 **Type consistency:** `parseResult` returns `{ success, authFailure, message?, error? }` in Task 2; Task 3 resolves that shape; Task 4 consumes `result.success`, `result.message`, `result.error`. `buildArgs` returns `string[]` throughout. Constructor is `{ logger, cwd, binary? }` in Tasks 1 and 3.
 
 **Known gap:** the scheduler's existing `isUnrecoverableAuthError` duplicates `isAuthFailure` in the executor. After Task 4, the scheduler can read `result.authFailure` directly. Fold that into Task 4's implementation step if both are present at review.
+
+---
+
+## Part 2: Scheduling from rate-limit events
+
+Added 2026-09-24 after Tasks 1-6 landed. See the spec section "Scheduling from
+rate-limit events" for the evidence and the two decisions.
+
+### Task 7: Executor reads `stream-json` and the rate-limit event
+
+**Files:** `src/features/claude/executor/ClaudeCliExecutor.js`,
+`test/ClaudeCliExecutor.args.test.js`, `test/ClaudeCliExecutor.parse.test.js`,
+`test/ClaudeCliExecutor.run.test.js`
+
+**Produces:** `parseResult(...)` gains `rateLimit: { status, resetsAt, fiveHourResetsAt } | null`,
+with both times as `Date` or `null`.
+
+- `buildArgs` emits `--output-format stream-json --verbose`; the args test that
+  asserted `json` asserts `stream-json` instead.
+- `parseResult` reads JSON Lines. The `result` line supplies success, cost,
+  duration and session id as before. The last `rate_limit_event` supplies
+  `rateLimit`.
+- Tests: success with an event; a `rejected` event; output with no event;
+  several events (last one wins); `unifiedWindows` absent (falls back to
+  `resetsAt` when `rateLimitType` is `five_hour` or missing); a non-5-hour
+  `rateLimitType` without `unifiedWindows` (no 5-hour time); unparseable stdout
+  falls back to stderr as today.
+
+### Task 8: Next pulse time from the event
+
+**Files:** `src/features/scheduling/strategy/scheduling-strategies.js`,
+`test/scheduling.window.test.js`
+
+**Produces:** `export function nextPulseFromRateLimit(rateLimit, now)` returning
+`Date | null`, and `WindowResetStrategy` (`window_reset`) reading
+`context.rateLimit`.
+
+- `allowed` / `allowed_warning` → `fiveHourResetsAt + 10 s`
+- `rejected` → `resetsAt + 10 s`
+- `null` input, missing time, or a time not after `now` → `null`
+- No hour alignment.
+- Strategy order: `scheduled_start` (first schedule only), `window_reset`,
+  `discovery`. `ResetSignalStrategy`, `ActiveCycleStrategy` and
+  `CruiseStrategy` are deleted.
+
+### Task 9: Scheduler records the event and stops treating rejection as failure
+
+**Files:** `src/features/scheduling/automation/scheduler.js`,
+`test/scheduler.window.test.js`, existing scheduler tests
+
+- `_processPulseResult` stores the latest `rateLimit` on the scheduler.
+- A `rejected` result is not retried, does not increment
+  `consecutiveFailures`, and raises no alert.
+- `_scheduleNext` passes `rateLimit` in the strategy context. The
+  `alreadyRescheduled` path and `_handleSessionLimit` go: scheduling happens in
+  one place.
+- Tests: an allowed pulse schedules the next one at window reset + 10 s; a
+  rejected pulse makes one attempt, leaves the failure count unchanged and
+  schedules at `resetsAt + 10 s`; a failed pulse with no event falls back to
+  discovery.
+
+### Task 10: Remove log scanning and dead configuration
+
+**Files:** delete `SessionTracker.js`, `ClaudeLogReader.js`,
+`ProjectLogAggregator.js`, `CycleComputer.js`, `SessionLimitParser.js`; modify
+`scheduler.js` (drop the `sessionTracker` dependency and the startup expiry
+check), `src/index.js` (wiring, mock-mode warnings), `package.json`
+(`docker:run:mock-*` and `*:with-volume` scripts)
+
+- The startup pulse always runs when `IMMEDIATE_PULSE_AFTER_AUTH` is true: it is
+  how the first window is learned.
+- Dry-run output drops the session-tracker status block.
+- Guard: extend `test/no-credential-code.test.js`, or add a sibling, so the
+  removed modules cannot be reintroduced unnoticed.
+
+### Task 11: Volume and documentation
+
+**Files:** `docker-compose.yml`, `docker-compose.dev.yml`, `ENVIRONMENT.md`,
+`README.md`, `docs/workflow-diagrams.md`
+
+- Remove the `claudepulse-data` volume and its top-level declaration.
+- Remove `MOCK_CLAUDE_*` and `SESSION_LIMIT_TIME_REGEX` from `ENVIRONMENT.md`.
+- Rewrite the scheduling description and the strategy diagram for
+  `scheduled_start` → `window_reset` → `discovery`.
+- The README "Smart 5-Hour Cycle Detection" row describes the event, not
+  session history.

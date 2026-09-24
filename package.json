@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "start": "node src/index.js",
+    "test": "node --test \"test/*.test.js\"",
     "dev": "NODE_ENV=development LOG_LEVEL=DEBUG node src/index.js",
     "prod": "NODE_ENV=production LOG_LEVEL=INFO node src/index.js",
     "lint": "echo 'Linting JavaScript files...' && find src -name '*.js' -exec node -c {} \\;",

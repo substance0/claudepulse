@@ -4,6 +4,42 @@
 import { DateUtility } from "../../../core/utils/DateUtility.js";
 
 /**
+ * Delay after a window resets before pulsing, so the pulse lands in the new
+ * window rather than racing its boundary.
+ */
+const WINDOW_RESET_BUFFER_MS = 10 * 1000;
+
+/**
+ * Compute when to pulse next from the rate-limit state reported by a pulse.
+ *
+ * An allowed pulse means a window is open, so the next pulse should open the
+ * following one, just after the 5-hour reset. A rejected pulse means requests
+ * are refused until the blocking window resets, which may be the weekly one;
+ * pulsing earlier would only be rejected again.
+ *
+ * The reset is not rounded to the hour: windows do not start on the hour.
+ * @param {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null}|null} rateLimit
+ * @param {Date} now - Current time
+ * @returns {Date|null} Next pulse time, or null when it cannot be determined
+ */
+export function nextPulseFromRateLimit(rateLimit, now) {
+  if (!rateLimit) {
+    return null;
+  }
+
+  const reset =
+    rateLimit.status === "rejected"
+      ? rateLimit.resetsAt
+      : rateLimit.fiveHourResetsAt;
+
+  if (!reset || reset.getTime() <= now.getTime()) {
+    return null;
+  }
+
+  return new Date(reset.getTime() + WINDOW_RESET_BUFFER_MS);
+}
+
+/**
  * Base class for scheduling strategies
  */
 class SchedulingStrategy {
@@ -38,42 +74,9 @@ class SchedulingStrategy {
 }
 
 /**
- * Reset signal strategy - handles explicit next run time from session limiting
- * Responds to Claude's rate limit messages with reset times
- */
-class ResetSignalStrategy extends SchedulingStrategy {
-  computeNextRunTime(context) {
-    if (!context.nextRunTime) {
-      context.logger?.info(
-        "strategy",
-        "reset_signal: Not applicable - no session limit message received during current session",
-      );
-      return null;
-    }
-
-    context.logger?.info(
-      "strategy",
-      `reset_signal: Applicable - scheduling based on session limit reset time ${DateUtility.formatLocalIso(context.nextRunTime)}`,
-    );
-
-    return {
-      time: context.alignToHourPlusTen(context.nextRunTime),
-      strategy: "reset_signal",
-    };
-  }
-
-  getStrategyName() {
-    return "reset_signal";
-  }
-
-  getPriority() {
-    return 1; // Highest priority
-  }
-}
-
-/**
- * Scheduled start strategy - schedules first pulse only at configured hour
- * Only applies when no previous schedule exists (lastScheduledTime is null)
+ * Scheduled start strategy - schedules the first pulse at a configured hour.
+ * An explicit SCHEDULED_START_HOUR is user intent, so it outranks the window,
+ * but only for the first scheduled pulse; every later pulse follows the window.
  */
 class ScheduledStartStrategy extends SchedulingStrategy {
   computeNextRunTime(context) {
@@ -82,11 +85,11 @@ class ScheduledStartStrategy extends SchedulingStrategy {
         "strategy",
         "scheduled_start: Not applicable - only used for first pulse, already scheduled once",
       );
-      return null; // Only for initial scheduling
+      return null;
     }
 
-    const fromReset = context.nextFromInitialPulseHourPlusTen(context.now);
-    if (!fromReset) {
+    const configuredStart = context.nextFromInitialPulseHourPlusTen(context.now);
+    if (!configuredStart) {
       context.logger?.info(
         "strategy",
         "scheduled_start: Not applicable - no SCHEDULED_START_HOUR configured in environment",
@@ -96,11 +99,11 @@ class ScheduledStartStrategy extends SchedulingStrategy {
 
     context.logger?.info(
       "strategy",
-      `scheduled_start: Applicable - scheduling first pulse at configured SCHEDULED_START_HOUR`,
+      "scheduled_start: Applicable - scheduling first pulse at configured SCHEDULED_START_HOUR",
     );
 
     return {
-      time: fromReset,
+      time: configuredStart,
       strategy: "scheduled_start",
     };
   }
@@ -110,129 +113,56 @@ class ScheduledStartStrategy extends SchedulingStrategy {
   }
 
   getPriority() {
+    return 1;
+  }
+}
+
+/**
+ * Window reset strategy - pulses when the current rate-limit window resets,
+ * using the rate-limit state the last pulse reported.
+ */
+class WindowResetStrategy extends SchedulingStrategy {
+  computeNextRunTime(context) {
+    const time = nextPulseFromRateLimit(context.rateLimit, context.now);
+
+    if (!time) {
+      context.logger?.info(
+        "strategy",
+        "window_reset: Not applicable - no upcoming window reset reported by the last pulse",
+      );
+      return null;
+    }
+
+    context.logger?.info(
+      "strategy",
+      `window_reset: Applicable - ${context.rateLimit.status} pulse, window resets ${DateUtility.formatLocalIso(time)}`,
+    );
+
+    return {
+      time,
+      strategy: "window_reset",
+    };
+  }
+
+  getStrategyName() {
+    return "window_reset";
+  }
+
+  getPriority() {
     return 2;
   }
 }
 
 /**
- * Active cycle strategy - schedules based on current session expiry + 10 seconds
- * Detects active cycles and schedules pulse right after expiry
- */
-class ActiveCycleStrategy extends SchedulingStrategy {
-  async computeNextRunTime(context) {
-    if (context.lastScheduledTime) {
-      context.logger?.info(
-        "strategy",
-        "active_cycle: Not applicable - only used for initial scheduling, already scheduled once",
-      );
-      return null; // Only for initial scheduling
-    }
-
-    try {
-      const expiry = context.sessionTracker.getSessionWindowExpiry();
-
-      if (expiry && expiry > context.now) {
-        context.logger?.info(
-          "strategy",
-          `active_cycle: Applicable - detected active session window expiring at ${DateUtility.formatLocalIso(expiry)}, scheduling 10 seconds after expiry`,
-        );
-        return {
-          time: new Date(expiry.getTime() + 10 * 60 * 1000),
-          strategy: "active_cycle",
-        };
-      }
-
-      context.logger?.info(
-        "strategy",
-        "active_cycle: Not applicable - no cycle limit message found, cannot determine active cycle without reset time",
-      );
-    } catch (error) {
-      context.logger?.info(
-        "strategy",
-        `active_cycle: Not applicable - unable to read Claude project logs (${error.message})`,
-      );
-    }
-
-    return null;
-  }
-
-  getStrategyName() {
-    return "active_cycle";
-  }
-
-  getPriority() {
-    return 3;
-  }
-}
-
-/**
- * Cruise strategy - maintains 5-hour intervals after cycle detection
- *
- * Only applies when:
- * - A cycle limit message has been detected (confirming cycle boundaries)
- * - A pulse was previously executed (lastScheduledTime exists)
- *
- * Uses 5-hour intervals aligned with known cycle boundaries to maintain
- * regular cadence between cycle resets.
- */
-class CruiseStrategy extends SchedulingStrategy {
-  computeNextRunTime(context) {
-    if (!context.lastScheduledTime) {
-      context.logger?.info(
-        "strategy",
-        "cruise: Not applicable - no previous pulse executed yet (first run)",
-      );
-      return null;
-    }
-
-    // Only use cruise strategy if we have detected a cycle limit message
-    const hasLimitMessage =
-      context.sessionTracker?.latestCycleLimitReset != null;
-
-    if (!hasLimitMessage) {
-      context.logger?.info(
-        "strategy",
-        "cruise: Not applicable - no cycle detected yet, discovery mode still active",
-      );
-      return null;
-    }
-
-    const intervalHours = Math.round(
-      context.fixedIntervalMs / (1000 * 60 * 60),
-    );
-
-    context.logger?.info(
-      "strategy",
-      `cruise: Applicable - scheduling ${intervalHours}h after last pulse (cycle detected)`,
-    );
-
-    return {
-      time: new Date(
-        context.lastScheduledTime.getTime() + context.fixedIntervalMs,
-      ),
-      strategy: "cruise",
-    };
-  }
-
-  getStrategyName() {
-    return "cruise";
-  }
-
-  getPriority() {
-    return 4;
-  }
-}
-
-/**
- * Discovery strategy - send hourly pulses to discover cycle boundaries
- * Used when no cycle limit information is available yet
+ * Discovery strategy - pulses on the next hour when no window is known, for
+ * example after a pulse that failed before reporting its rate-limit state.
+ * A single successful pulse is enough to learn the window.
  */
 class DiscoveryStrategy extends SchedulingStrategy {
   computeNextRunTime(context) {
-    // This is always available as a fallback
     context.logger?.info(
       "strategy",
-      "discovery: Applicable - no cycle information available, using hourly pulse strategy",
+      "discovery: Applicable - no window known, pulsing on the next hour to learn it",
     );
 
     return {
@@ -246,7 +176,7 @@ class DiscoveryStrategy extends SchedulingStrategy {
   }
 
   getPriority() {
-    return 99; // Very low priority - fallback when no cycle info available
+    return 99; // Fallback when no window is known
   }
 }
 
@@ -256,10 +186,8 @@ class DiscoveryStrategy extends SchedulingStrategy {
 class SchedulingStrategyManager {
   constructor() {
     this.strategies = [
-      new ResetSignalStrategy(),
       new ScheduledStartStrategy(),
-      new ActiveCycleStrategy(),
-      new CruiseStrategy(),
+      new WindowResetStrategy(),
       new DiscoveryStrategy(),
     ].sort((a, b) => a.getPriority() - b.getPriority());
   }
@@ -321,10 +249,8 @@ class SchedulingStrategyManager {
 
 export {
   SchedulingStrategy,
-  ResetSignalStrategy,
   ScheduledStartStrategy,
-  ActiveCycleStrategy,
-  CruiseStrategy,
+  WindowResetStrategy,
   DiscoveryStrategy,
   SchedulingStrategyManager,
 };

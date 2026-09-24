@@ -1,26 +1,14 @@
-import logger from "../../../core/utils/logger.js";
 import { DateUtility } from "../../../core/utils/DateUtility.js";
-import SessionTracker from "../../claude/session/SessionTracker.js";
 import { SchedulingStrategyManager } from "../strategy/scheduling-strategies.js";
 
 /**
  * Claude Session Automation Scheduler
  * Manages periodic pulse messages to maintain Claude sessions
  *
- * Discovery Mode vs Normal Mode
- * ==============================
- *
- * Discovery Mode:
- * - Triggered when no cycle limit message exists in historical logs
- * - Cannot reliably determine active cycle without "resets at X" message
- * - Sends hourly pulses to systematically discover cycle boundaries
- * - Exits when a cycle limit response is received
- *
- * Normal Mode:
- * - Uses most recent cycle limit message as authoritative anchor
- * - Computes accurate 5-hour cycle boundaries from the limit
- * - Schedules pulses at cycle expiry + 10s
- * - Maintains 5-hour cadence between pulses
+ * Every pulse reports the rate-limit window it ran in. The next pulse is
+ * scheduled just after that window resets, so a new window opens as soon as
+ * the previous one ends. When no window is known yet, for example after a
+ * pulse that failed before reporting one, pulses fall back to the next hour.
  */
 function parseConfig(options) {
   return {
@@ -83,6 +71,15 @@ function isUnrecoverableAuthError(error) {
 }
 
 /**
+ * Whether a pulse was refused because a usage window is exhausted.
+ * @param {Object} pulseResult - Result from _sendPulse()
+ * @returns {boolean}
+ */
+function isLimitReached(pulseResult) {
+  return pulseResult.rateLimit?.status === "rejected";
+}
+
+/**
  * Claude Session Automation Scheduler
  * Manages periodic pulse messages to maintain Claude sessions
  * @class PulseScheduler
@@ -92,7 +89,6 @@ export class PulseScheduler {
    * Create PulseScheduler instance with injected dependencies
    * @param {Object} options - Configuration options
    * @param {Object} options.executor - Runs a pulse; see ClaudeCliExecutor
-   * @param {Object} options.sessionTracker - SessionTracker instance
    * @param {Object} options.logger - Logger instance
    * @param {Object} options.config - Configuration object
    */
@@ -100,9 +96,6 @@ export class PulseScheduler {
     // Validate required dependencies
     if (!options.executor) {
       throw new Error("PulseScheduler requires executor dependency");
-    }
-    if (!options.sessionTracker) {
-      throw new Error("PulseScheduler requires sessionTracker dependency");
     }
     if (!options.logger) {
       throw new Error("PulseScheduler requires logger dependency");
@@ -113,7 +106,6 @@ export class PulseScheduler {
 
     // Injected dependencies
     this.executor = options.executor;
-    this.sessionTracker = options.sessionTracker;
     this.logger = options.logger.child({
       component: "scheduler",
       intervalHours: options.config.intervalHours || 5,
@@ -132,24 +124,16 @@ export class PulseScheduler {
     this.shutdownRequested = false;
     this.lastScheduledTime = null; // track last planned run start
     this.fixedIntervalMs = 5 * 60 * 60 * 1000; // 5 hours
+    // Latest rate-limit state reported by a pulse; drives scheduling
+    this.rateLimit = null;
 
     this.schedulingManager = new SchedulingStrategyManager();
 
-    // Don't update session tracking yet - do it after authentication to avoid interrupting OAuth menu
     this.logger.info("scheduler", "PulseScheduler initialized", {
       intervalHours: this.config.intervalHours,
       promptText: this.config.promptText,
       dryRun: this.config.dryRun,
     });
-  }
-
-  /**
-   * Check if we're in discovery mode (no cycle limit message found yet)
-   * Discovery mode uses hourly pulses to systematically discover cycle boundaries
-   * @returns {boolean} True if in discovery mode, false if in normal mode
-   */
-  _isInDiscoveryMode() {
-    return this.sessionTracker?.latestCycleLimitReset == null;
   }
 
   _calculateBackoffDelay(attempt) {
@@ -166,17 +150,6 @@ export class PulseScheduler {
     const d = new Date(fromDate);
     d.setUTCHours(d.getUTCHours() + 1, 0, 10, 0);
     return d;
-  }
-
-  // Align a given time to hour boundary + 10 seconds (round up if needed)
-  _alignToHourPlusTen(date) {
-    const d = new Date(date);
-    const sameHour = new Date(d);
-    sameHour.setUTCMinutes(0, 10, 0);
-    if (d <= sameHour && d.getUTCHours() === sameHour.getUTCHours()) {
-      return sameHour;
-    }
-    return this._nextHourPlusTen(d);
   }
 
   _nextFromInitialPulseHourPlusTen(fromDate = new Date()) {
@@ -229,6 +202,7 @@ export class PulseScheduler {
             session_id: "dry-run-session-id",
           },
         },
+        rateLimit: null,
         timerDurationMs: duration?.ms,
       };
     }
@@ -242,148 +216,92 @@ export class PulseScheduler {
           cost: result.message?.total_cost_usd,
           duration: result.message?.duration_ms,
           sessionId: result.message?.session_id,
+          windowResetsAt: result.rateLimit?.fiveHourResetsAt?.toISOString(),
           timerDurationMs: duration?.ms,
         });
 
         return {
           success: true,
           result,
+          rateLimit: result.rateLimit ?? null,
           timerDurationMs: duration?.ms,
         };
       }
 
-      // Handle failures, including session limits
-      this.logger.error("pulse", "Pulse failed", {
-        error: result.error,
-        consecutiveFailures: this.consecutiveFailures + 1,
-        timerDurationMs: duration?.ms,
-        sessionLimitReached: result.sessionLimitReached,
-      });
+      if (isLimitReached(result)) {
+        this.logger.info("pulse", "Usage limit reached - waiting for reset", {
+          resetsAt: result.rateLimit.resetsAt?.toISOString(),
+          timerDurationMs: duration?.ms,
+        });
+      } else {
+        // Logged at warn, not error: error raises an alert, and alerts are
+        // raised once per cycle by _reportCycleFailure, spaced out.
+        this.logger.warn("pulse", "Pulse failed", {
+          error: result.error,
+          timerDurationMs: duration?.ms,
+        });
+      }
 
       return {
         success: false,
         error: result.error,
-        sessionLimitReached: result.sessionLimitReached,
-        sessionLimitInfo: result.sessionLimitInfo,
+        rateLimit: result.rateLimit ?? null,
         timerDurationMs: duration?.ms,
       };
     } catch (error) {
       const duration = this.logger.endTimer(timer);
-      this.logger.error("pulse", "Pulse exception", {
+      this.logger.warn("pulse", "Pulse exception", {
         error: error.message,
-        consecutiveFailures: this.consecutiveFailures + 1,
         timerDurationMs: duration?.ms,
       });
 
       return {
         success: false,
         error: error.message,
+        rateLimit: null,
         timerDurationMs: duration?.ms,
       };
     }
   }
 
   /**
-   * Process pulse result with centralized session limit detection and state management
+   * Record a pulse result's rate-limit state, and reset the failure count on
+   * success. Failures are counted per cycle by the caller, not per attempt.
    * @param {Object} pulseResult - Result from _sendPulse()
-   * @param {boolean} shouldReschedule - Whether to reschedule on session limit (default: true)
-   * @returns {Object} Processed result with session limit handling applied
+   * @returns {Object} The same result, with `limitReached` set
    */
-  async _processPulseResult(pulseResult, shouldReschedule = true) {
+  _processPulseResult(pulseResult) {
+    // Keep the last reported window until a pulse reports a new one. A
+    // transient failure mid-window does not change when the window resets,
+    // and a reset that has passed is ignored when scheduling.
+    if (pulseResult.rateLimit) {
+      this.rateLimit = pulseResult.rateLimit;
+    }
+
     if (pulseResult.success) {
-      // Reset failure count on success
       this.consecutiveFailures = 0;
       this.lastSuccessTime = new Date();
-      return pulseResult;
     }
 
-    // Handle failures
-    this.consecutiveFailures++;
-
-    // Feed session limit signal to session tracker for self-correction
-    if (pulseResult.sessionLimitReached && pulseResult.sessionLimitInfo) {
-      try {
-        this.sessionTracker.registerSessionLimitSignal(
-          pulseResult.sessionLimitInfo,
-        );
-      } catch {}
-
-      // Handle session limit rescheduling if requested
-      if (shouldReschedule) {
-        this.logger.info(
-          "pulse",
-          "Session limit reached - rescheduling next pulse to reset time",
-        );
-        await this._handleSessionLimit(pulseResult.sessionLimitInfo);
-      }
-    }
-
-    return pulseResult;
+    // An exhausted allowance means Claude is in use, not that ClaudePulse is
+    // broken, so callers do not count it as a failure.
+    return { ...pulseResult, limitReached: isLimitReached(pulseResult) };
   }
 
-  async _handleSessionLimit(sessionLimitInfo) {
-    if (!sessionLimitInfo) {
-      this.logger.warn(
-        "sessionlimit",
-        "Session limit handler called without valid info",
-      );
-      return;
-    }
-
-    const { resetTimeRaw, resetAt } = sessionLimitInfo;
-    this.logger.warn(
-      "ratelimit",
-      "Session limit reached, calculating next run time",
-      { resetTimeRaw, resetAt },
-    );
-
-    let nextRunTime = null;
-    if (resetAt) {
-      const dt = new Date(resetAt);
-      if (!isNaN(dt.getTime())) nextRunTime = dt;
-    }
-
-    if (!nextRunTime && resetTimeRaw) {
-      const timeMatch = resetTimeRaw.match(/(\d{1,2}):?(\d{2})?(am|pm)/i);
-      if (!timeMatch) {
-        this.logger.error(
-          "ratelimit",
-          "Could not parse reset time from raw value",
-          { resetTimeRaw },
-        );
-        return;
-      }
-
-      let hours = parseInt(timeMatch[1]);
-      const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
-      const period = timeMatch[3].toLowerCase();
-
-      if (period === "pm" && hours !== 12) {
-        hours += 12;
-      } else if (period === "am" && hours === 12) {
-        hours = 0;
-      }
-
-      nextRunTime = new Date();
-      nextRunTime.setUTCHours(hours, minutes, 0, 0);
-
-      if (nextRunTime < new Date()) {
-        nextRunTime.setUTCDate(nextRunTime.getUTCDate() + 1);
-      }
-    }
-
-    if (!nextRunTime) {
-      this.logger.warn(
-        "ratelimit",
-        "No reset time parsed; using next hour + 10 seconds",
-      );
-      nextRunTime = this._nextHourPlusTen();
-    }
-
-    // Always align to exact hour + 10 seconds
-    nextRunTime = this._alignToHourPlusTen(nextRunTime);
-
-    await this._scheduleNext(nextRunTime);
+  /**
+   * Count a failed cycle and report it. Counting cycles rather than attempts
+   * keeps the count on the alert schedule: counting three attempts per cycle
+   * gave 3, 6, 9... which never reaches a power of two, so a sustained
+   * transient outage never alerted.
+   * @param {string} message - Human-readable failure description
+   * @param {Object} data - Structured context for the log entry
+   */
+  _failCycle(message, data) {
+    this.consecutiveFailures++;
+    this._reportCycleFailure(message, {
+      ...data,
+      consecutiveFailures: this.consecutiveFailures,
+    });
   }
 
   /**
@@ -403,7 +321,6 @@ export class PulseScheduler {
 
   /**
    * Execute one pulse cycle with retry logic
-   * @returns {boolean} True if cycle already rescheduled next run (e.g., due to session limit), false otherwise
    */
   async _executePulseCycle() {
     this.logger.info("cycle", "Starting new pulse cycle");
@@ -411,7 +328,7 @@ export class PulseScheduler {
     for (let attempt = 0; attempt < this.config.maxRetries; attempt++) {
       if (this.shutdownRequested) {
         this.logger.info("cycle", "Shutdown requested, aborting cycle");
-        return false;
+        return;
       }
 
       // Apply backoff delay for retries
@@ -430,34 +347,33 @@ export class PulseScheduler {
           "cycle",
           "Shutdown requested during backoff, aborting cycle",
         );
-        return false;
+        return;
       }
 
-      const rawResult = await this._sendPulse();
-      const result = await this._processPulseResult(rawResult, true);
+      const result = this._processPulseResult(await this._sendPulse());
 
       if (result.success) {
         this.logger.info("cycle", "Pulse cycle completed successfully");
-        return false; // Success, needs normal scheduling
+        return;
       }
 
-      // Handle session limit - _processPulseResult already handled rescheduling
-      if (result.sessionLimitReached) {
-        this.logger.debug(
+      // Retrying before the window resets would only be refused again.
+      if (result.limitReached) {
+        this.logger.info(
           "cycle",
-          "Session limit detected - next run already rescheduled by _processPulseResult",
+          "Usage limit reached - next pulse follows the window reset",
         );
-        return true; // Already rescheduled, don't schedule again
+        return;
       }
 
       // An expired or rejected token cannot be fixed by sending again, so
       // abandon the cycle instead of burning the remaining attempts.
       if (isUnrecoverableAuthError(result.error)) {
-        this._reportCycleFailure(
+        this._failCycle(
           "Authentication rejected - re-authenticate to resume pulsing",
           { error: result.error },
         );
-        return false;
+        return;
       }
 
       // Handle other failures
@@ -468,18 +384,15 @@ export class PulseScheduler {
     }
 
     // All retries exhausted
-    this._reportCycleFailure("All retry attempts exhausted", {
+    this._failCycle("All retry attempts exhausted", {
       maxRetries: this.config.maxRetries,
-      consecutiveFailures: this.consecutiveFailures,
     });
-    return false; // Needs normal scheduling
   }
 
   /**
    * Schedule the next pulse execution using strategy pattern
-   * @param {Date|null} nextRunTime - External signal for next run time (e.g., from session limiting)
    */
-  async _scheduleNext(nextRunTime) {
+  async _scheduleNext() {
     if (this.shutdownRequested || !this.running) {
       this.logger.debug(
         "schedule",
@@ -498,13 +411,10 @@ export class PulseScheduler {
 
     // Create context for scheduling strategies
     const context = {
-      nextRunTime,
-      lastScheduledTime: this.lastScheduledTime,
-      fixedIntervalMs: this.fixedIntervalMs,
       now,
-      sessionTracker: this.sessionTracker,
+      rateLimit: this.rateLimit,
+      lastScheduledTime: this.lastScheduledTime,
       logger: this.logger,
-      alignToHourPlusTen: (time) => this._alignToHourPlusTen(time),
       nextFromInitialPulseHourPlusTen: (time) =>
         this._nextFromInitialPulseHourPlusTen(time),
       nextHourPlusTen: () => this._nextHourPlusTen(),
@@ -514,7 +424,7 @@ export class PulseScheduler {
     const { time: planned, strategy } =
       await this.schedulingManager.computeNextRunTime(context);
 
-    // Ensure planned time is in future; if drifted, roll forward in 5h steps
+    // Strategies return future times; roll forward defensively if one did not
     let finalTime = planned;
     while (finalTime <= now) {
       finalTime = new Date(finalTime.getTime() + this.fixedIntervalMs);
@@ -539,44 +449,31 @@ export class PulseScheduler {
     // Schedule execution
     this.timer = setTimeout(async () => {
       if (this.running && !this.shutdownRequested) {
-        const alreadyRescheduled = await this._executePulseCycle();
+        await this._executePulseCycle();
 
-        // Only schedule next run if cycle didn't already reschedule (e.g., due to session limit)
-        if (!alreadyRescheduled && this.running && !this.shutdownRequested) {
-          await this._scheduleNext(); // Schedule strictly by fixed cadence
-        } else if (alreadyRescheduled) {
-          this.logger.debug(
-            "schedule",
-            "Skipping normal scheduling - already rescheduled by session limit handler",
-          );
+        if (this.running && !this.shutdownRequested) {
+          await this._scheduleNext();
         }
       }
     }, intervalMs);
   }
 
   /**
-   * Start the automation scheduler
-   */
-  /**
    * Perform dry run analysis - show what would happen without actually scheduling
    */
   async dryRunAnalysis() {
     this.logger.info("dry-run", "=== DRY RUN MODE - ANALYSIS ONLY ===");
 
-    // Optionally show current status
-    await this.sessionTracker.updateSessionTracking();
-    const sessionStatus = this.sessionTracker.getStatus();
-    this.logger.info("dry-run", "Current Session Status", sessionStatus);
-
-    // Fixed schedule: next hour + 10, then every 5 hours
-    const optimalNextRun = this._nextHourPlusTen();
+    // Without a real pulse no window is known, so the first pulse would
+    // follow the configured start hour or the next hour.
+    const optimalNextRun =
+      this._nextFromInitialPulseHourPlusTen() ?? this._nextHourPlusTen();
     const intervalMs = optimalNextRun.getTime() - Date.now();
 
     this.logger.info("dry-run", "Scheduling Analysis", {
       optimalSchedule: optimalNextRun.toISOString(),
       intervalHours: this.config.intervalHours,
       intervalMs,
-      sessionAware: false,
       timeUntilRun: `${Math.floor(intervalMs / (60 * 60 * 1000))}h ${Math.floor((intervalMs % (60 * 60 * 1000)) / (60 * 1000))}m`,
     });
 
@@ -603,104 +500,43 @@ export class PulseScheduler {
       intervalHours: this.config.intervalHours,
     });
 
-    await this.sessionTracker.updateSessionTracking();
-
-    // Send initial pulse to discover cycle state
-    let alreadyRescheduled = false;
+    // The first pulse reports the current window, which every later pulse is
+    // scheduled from.
     if (this.config.immediatePulseAfterAuth) {
-      alreadyRescheduled = await this._sendInitialPulseToDiscoverCycleState();
+      await this._sendInitialPulse();
     }
 
-    // Schedule recurring pulses (only if initial pulse didn't already reschedule)
-    if (!alreadyRescheduled) {
-      await this._scheduleNext();
-    } else {
-      this.logger.debug(
-        "start",
-        "Skipping normal scheduling - initial pulse triggered session limit, already rescheduled",
-      );
-    }
+    await this._scheduleNext();
 
     this.logger.logScheduler("started");
     return true;
   }
 
   /**
-   * Send initial pulse to discover current cycle state
-   *
-   * Discovery Mode: If no cycle expiry is known, sends a pulse to probe for limits
-   * Normal Mode: If active cycle expiry is known, skips pulse
-   *
-   * This function focuses on a single concern: determining if we need to send
-   * an initial discovery pulse based on whether we know the cycle expiry.
-   *
-   * @returns {boolean} True if pulse triggered session limit and already rescheduled, false otherwise
+   * Send one pulse at startup, to open a window if none is active and to
+   * learn when the current one resets.
    */
-  async _sendInitialPulseToDiscoverCycleState() {
+  async _sendInitialPulse() {
+    this.logger.info("startup", "Sending initial pulse to learn the current window");
+
     try {
-      // Check if we know when the current cycle expires
-      const cycleExpiry = this.sessionTracker.getGlobalCycleExpiry();
-      const hasKnownExpiry = cycleExpiry !== null;
+      const result = this._processPulseResult(await this._sendPulse());
 
-      // If we know the cycle expiry, skip the discovery pulse
-      if (hasKnownExpiry) {
-        this.logger.info(
-          "startup",
-          "Skipping initial pulse - active cycle with known expiry detected",
-          {
-            cycleExpiry: cycleExpiry.toISOString(),
-            mode: "normal"
-          },
-        );
-        return false; // No pulse sent, needs normal scheduling
-      }
-
-      // Discovery mode: We don't know the cycle expiry, send a pulse to discover it
-      this.logger.info(
-        "startup",
-        "Sending initial pulse to discover cycle state and confirm authentication",
-        { mode: "discovery" },
-      );
-
-      try {
-        const rawResult = await this._sendPulse();
-        const result = await this._processPulseResult(rawResult, true);
-
-        if (result.success) {
-          this.logger.info(
-            "startup",
-            "Initial pulse successful - no limit response, entering discovery mode",
-            { mode: "discovery" },
-          );
-          return false; // No limit, needs normal scheduling
-        } else {
-          this.logger.warn("startup", "Initial pulse failed", {
-            success: false,
-            error: result.error,
-            sessionLimitReached: result.sessionLimitReached,
-          });
-
-          // Cycle limit rescheduling already handled by _processPulseResult
-          if (result.sessionLimitReached) {
-            this.logger.info(
-              "startup",
-              "Cycle limit detected! Exiting discovery mode, switching to normal scheduling",
-            );
-            return true; // Already rescheduled by session limit handler
-          }
-          return false; // Other failure, needs normal scheduling
-        }
-      } catch (error) {
-        this.logger.warn("startup", "Initial pulse failed", {
-          error: error.message,
+      if (result.success) {
+        this.logger.info("startup", "Initial pulse successful", {
+          windowResetsAt: this.rateLimit?.fiveHourResetsAt?.toISOString(),
         });
-        return false; // Error, needs normal scheduling
+      } else if (result.limitReached) {
+        this.logger.info("startup", "Usage limit reached at startup", {
+          resetsAt: this.rateLimit?.resetsAt?.toISOString(),
+        });
+      } else {
+        // A failure at startup is exactly when an alert matters most: a
+        // container restarted with a dead token should say so immediately.
+        this._failCycle("Initial pulse failed", { error: result.error });
       }
     } catch (error) {
-      this.logger.debug("pulse", "Error checking for immediate pulse", {
-        error: error.message,
-      });
-      return false; // Error, needs normal scheduling
+      this._failCycle("Initial pulse failed", { error: error.message });
     }
   }
 
@@ -758,6 +594,7 @@ export class PulseScheduler {
       lastSuccessTime: this.lastSuccessTime,
       lastAttemptTime: this.lastAttemptTime,
       nextRunTime: this.timer ? this.lastScheduledTime : null,
+      rateLimit: this.rateLimit,
     };
   }
 }

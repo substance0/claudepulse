@@ -393,7 +393,7 @@ export class Logger {
           const optimal = DateUtility.formatLocalIso(
             new Date(data.optimalSchedule),
           );
-          return `scheduled_for=${optimal}, session_aware=${data.sessionAware}`;
+          return `scheduled_for=${optimal}`;
         }
         return "";
 

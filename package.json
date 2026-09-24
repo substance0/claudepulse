@@ -29,7 +29,6 @@
     "docker:run:interactive": "docker run -it --name claudepulse claudepulse",
     "docker:run:restart": "docker run -dt --name claudepulse --restart unless-stopped claudepulse",
     "docker:bash": "docker exec -it claudepulse /bin/sh",
-    "docker:oauth-verify": "docker exec -it claudepulse node src/scripts/oauth-verify.js",
     "docker:start": "docker start claudepulse",
     "docker:stop": "docker stop claudepulse",
     "docker:rm": "docker rm claudepulse",
@@ -38,9 +37,7 @@
     "docker:logs": "docker logs claudepulse",
     "docker:restart": "npm run docker:down && npm run docker:up",
     "docker:clean": "docker system prune -f && docker image prune -f",
-    "logs": "mkdir -p logs && tail -f logs/claudepulse.log",
-    "oauth-verify": "node src/scripts/oauth-verify.js",
-    "oauth-status": "node src/scripts/oauth-status.js"
+    "logs": "mkdir -p logs && tail -f logs/claudepulse.log"
   },
   "keywords": [
     "claude",
@@ -101,8 +98,5 @@
     "logLevel": "INFO",
     "defaultInterval": "5",
     "maxRetries": "3"
-  },
-  "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.1"
   }
 }

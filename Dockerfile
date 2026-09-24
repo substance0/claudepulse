@@ -33,8 +33,7 @@ COPY src/ ./src/
 
 # Set proper ownership and permissions
 RUN chown -R claudepulse:claudepulse /app && \
-    chmod +x src/index.js && \
-    chmod +x src/scripts/oauth-verify.js
+    chmod +x src/index.js
 
 # Switch to non-root user
 USER claudepulse

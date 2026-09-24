@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import ClaudeClient from "./features/claude/client/ClaudeClient.js";
 import { Logger } from "./core/utils/logger.js";
 import PulseScheduler from "./features/scheduling/automation/scheduler.js";
 import {
@@ -8,16 +7,9 @@ import {
   redactConfigSecrets,
   validateConfig,
 } from "./core/config/index.js";
-import AuthConfig from "./core/config/auth-config.js";
-import { OAuthManager } from "./features/auth/oauth/OAuthManager.js";
 import SessionTracker from "./features/claude/session/SessionTracker.js";
-import CredentialStore from "./features/auth/CredentialStore.js";
 import ClaudeLogReader from "./features/claude/ClaudeLogReader.js";
-import OAuthStateStore from "./features/auth/OAuthStateStore.js";
-import SdkExecutor from "./features/claude/executor/SdkExecutor.js";
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
-import ClaudeSdkAdapter from "./features/claude/client/ClaudeSdkAdapter.js";
-import ApiClient from "./features/claude/client/ApiClient.js";
 import { displayBanner } from "./core/utils/banner.js";
 import fs from "fs/promises";
 import path from "path";
@@ -77,43 +69,10 @@ function setupProcessErrorHandlers(scheduler, config) {
 async function runScheduler(config, logger) {
   // === Composition Root: Build dependency graph ===
 
-  // 1. Create AuthConfig and load it
-  const authConfig = new AuthConfig();
-  await authConfig.load();
-
-  // 2. Create child logger for client
+  // 1. Create child logger for the executor
   const clientLogger = logger.child({ component: "claude-client" });
 
-  // 3. Determine credentials path
-  const credentialsPath = "/home/claudepulse/.claude/.credentials.json";
-
-  // 4. Create CredentialStore
-  const credentialStore = new CredentialStore({
-    credentialsPath,
-    logger: clientLogger,
-    authConfig,
-  });
-
-  // 4.5. Create OAuthStateStore
-  const oauthStatePath = path.join(
-    path.dirname(credentialsPath),
-    ".oauth-pending.json",
-  );
-  const stateStore = new OAuthStateStore({
-    statePath: oauthStatePath,
-    logger: clientLogger,
-  });
-
-  // 5. Create OAuthManager with CredentialStore and StateStore
-  const oauthManager = new OAuthManager({
-    credentialsPath,
-    authConfig,
-    logger: clientLogger,
-    credentialStore,
-    stateStore,
-  });
-
-  // 5.5. Create the pulse executor. It runs Claude Code in a directory of its
+  // 2. Create the pulse executor. It runs Claude Code in a directory of its
   // own, so a pulse never loads the application's files or configuration.
   const pulseCwd = path.join(os.tmpdir(), "claudepulse-pulse");
   const pulseConfigDir = path.join(os.tmpdir(), "claudepulse-config");
@@ -126,46 +85,18 @@ async function runScheduler(config, logger) {
     configDir: pulseConfigDir,
   });
 
-  // 5.6. Create SDK execution chain (SdkExecutor -> ClaudeSdkAdapter -> ApiClient)
-  const sdkExecutor = new SdkExecutor({
-    logger: clientLogger,
-  });
-
-  const sdkAdapter = new ClaudeSdkAdapter({
-    sdkExecutor,
-    logger: clientLogger,
-  });
-
-  const apiClient = new ApiClient({
-    sdkAdapter,
-    logger: clientLogger,
-    maxRetries: config.MAX_RETRIES || 3,
-    retryBackoffMultiplier: config.RETRY_BACKOFF_MULTIPLIER || 2,
-    maxBackoffMinutes: config.MAX_BACKOFF_MINUTES || 30,
-  });
-
-  // 6. Create ClaudeClient with all dependencies
-  const client = new ClaudeClient({
-    credentialsPath,
-    logger: clientLogger,
-    authConfig,
-    oauthManager,
-    credentialStore,
-    apiClient,
-  });
-
-  // 7. Create ClaudeLogReader for SessionTracker
+  // 3. Create ClaudeLogReader for SessionTracker
   const logReaderLogger = logger.child({ component: "log-reader" });
   const logReader = new ClaudeLogReader({
     logger: logReaderLogger,
   });
 
-  // 8. Create SessionTracker with ClaudeLogReader
+  // 4. Create SessionTracker with ClaudeLogReader
   const sessionTracker = new SessionTracker({
     logReader,
   });
 
-  // 9. Create PulseScheduler with all dependencies
+  // 5. Create PulseScheduler with all dependencies
   const scheduler = new PulseScheduler({
     executor,
     sessionTracker,
@@ -187,7 +118,6 @@ async function runScheduler(config, logger) {
   // accepted surfaces as a failed pulse, which the scheduler reports without
   // spending its remaining attempts on it.
 
-  // Now that authentication is successful, start scheduler ONCE
   const startResult = await scheduler.start();
   if (!startResult) {
     logger.error("start", "Failed to start automation scheduler");

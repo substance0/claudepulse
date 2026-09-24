@@ -1,4 +1,3 @@
-import ClaudeClient from "../../claude/client/ClaudeClient.js";
 import logger from "../../../core/utils/logger.js";
 import { DateUtility } from "../../../core/utils/DateUtility.js";
 import SessionTracker from "../../claude/session/SessionTracker.js";
@@ -92,7 +91,7 @@ export class PulseScheduler {
   /**
    * Create PulseScheduler instance with injected dependencies
    * @param {Object} options - Configuration options
-   * @param {Object} options.client - ClaudeClient instance
+   * @param {Object} options.executor - Runs a pulse; see ClaudeCliExecutor
    * @param {Object} options.sessionTracker - SessionTracker instance
    * @param {Object} options.logger - Logger instance
    * @param {Object} options.config - Configuration object

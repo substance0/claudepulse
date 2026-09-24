@@ -184,12 +184,18 @@ npm run oauth-verify <verification_code>
 | `latest`, `X.Y.Z`, `X.Y`, `X` | when a release is cut      | production                  |
 | `edge`, `X.Y.Z-dev.N`         | every commit on `main`     | early access to merged work |
 | `snapshot-<branch>`           | on demand, from any branch | testing a branch            |
-| `sha-<commit>`                | every build                | pinning an exact build      |
+| `sha-<commit>`                | every edge and release     | pinning an exact build      |
 
-Build a snapshot of a branch:
+Build a snapshot of a branch (the branch must contain these workflows, so merge `main` into it first):
 
 ```bash
 gh workflow run docker-snapshot.yml --ref <branch>
+```
+
+Rebuild the image of an existing release, if its build failed:
+
+```bash
+gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
 ```
 
 Every image carries build provenance. Verify one with:

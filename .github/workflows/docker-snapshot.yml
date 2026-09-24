@@ -8,6 +8,12 @@ on:
 
 permissions: {}
 
+# One build per branch at a time, in order, so snapshot-<branch> always ends
+# on the newest commit and no push is interrupted before it is attested.
+concurrency:
+  group: docker-snapshot-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   image:
     permissions:

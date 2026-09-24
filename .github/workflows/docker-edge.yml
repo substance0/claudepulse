@@ -1,0 +1,25 @@
+name: Docker Edge
+
+# Every commit on main, for early adopters.
+# Tags: edge, X.Y.Z-dev.N, sha-<short>.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: docker-edge
+  cancel-in-progress: true
+
+jobs:
+  image:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      channel: edge

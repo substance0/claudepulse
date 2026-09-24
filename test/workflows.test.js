@@ -53,3 +53,40 @@ test("attests build provenance to the registry", () => {
   assert.match(text, /push-to-registry: true/);
   assert.match(text, /artifact-metadata: write/);
 });
+
+const CALLER_PERMISSIONS = [
+  "contents: read",
+  "packages: write",
+  "id-token: write",
+  "attestations: write",
+  "artifact-metadata: write",
+];
+
+test("snapshots run only on demand, for amd64", () => {
+  const text = read("docker-snapshot.yml");
+  assert.match(text, /workflow_dispatch/);
+  assert.doesNotMatch(text, /^\s*push:/m);
+  assert.match(text, /channel: snapshot/);
+  assert.match(text, /platforms: linux\/amd64$/m);
+});
+
+test("edge runs on every push to main", () => {
+  const text = read("docker-edge.yml");
+  assert.match(text, /push:\s*\n\s*branches: \[main\]/);
+  assert.match(text, /channel: edge/);
+});
+
+test("callers grant exactly what the build needs", () => {
+  for (const name of ["docker-snapshot.yml", "docker-edge.yml"]) {
+    const text = read(name);
+    for (const permission of CALLER_PERMISSIONS) {
+      assert.match(text, new RegExp(permission), `${name}: ${permission}`);
+    }
+  }
+});
+
+test("callers never mention latest", () => {
+  for (const name of ["docker-snapshot.yml", "docker-edge.yml"]) {
+    assert.doesNotMatch(read(name), /latest/, name);
+  }
+});

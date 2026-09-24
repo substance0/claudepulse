@@ -1,0 +1,22 @@
+name: Docker Snapshot
+
+# Build a testable image from any branch:
+#   gh workflow run docker-snapshot.yml --ref <branch>
+# Tags: snapshot-<branch>, sha-<short>. amd64 only - the target is the NAS.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  image:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      channel: snapshot
+      platforms: linux/amd64

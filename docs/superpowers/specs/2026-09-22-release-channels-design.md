@@ -95,9 +95,14 @@ under the decision rule above.
 Stable versions remain semantic-release's responsibility, unchanged.
 
 Edge builds derive a version in CI from `git describe --tags`, which now
-resolves as `v1.0.0-1-g761d7ac`, yielding `1.0.1-dev.1+g761d7ac`. This needs no
+resolves as `v1.0.0-1-g761d7ac`, yielding `1.0.1-dev.1`. This needs no
 new branch and no semantic-release configuration change. It sorts below the next
 stable release, so it is pinnable without ever shadowing a real version.
+
+The version carries no `+build` suffix such as `+g761d7ac`. Docker tags allow
+only `[A-Za-z0-9_.-]`, and `docker/metadata-action` rewrites anything else to
+`-`, so a semver build suffix would publish as a mangled tag. The `sha-<short>`
+tag published alongside identifies the commit instead.
 
 This derivation was blocked until 2026-09-22 by five orphaned local tags
 (`v1.0.0` through `v1.1.3`) that pointed at unreachable commits and were never

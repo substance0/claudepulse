@@ -1,5 +1,7 @@
 version: 2
 updates:
+  # Every npm dependency is a development dependency (release tooling); the
+  # application itself has none.
   - package-ecosystem: npm
     directory: "/"
     schedule:
@@ -7,22 +9,16 @@ updates:
       day: monday
       time: "03:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - substance0
     commit-message:
-      prefix: "chore(deps):"
+      # With include: scope, subjects read "chore(deps-dev): ..."
+      prefix: chore
       include: scope
     groups:
       semantic-release:
-        dependency-type: production
         patterns:
           - "semantic-release"
           - "@semantic-release/*"
-      minor-patch:
-        dependency-type: production
-        update-types:
-          - minor
-          - patch
+          - "conventional-changelog-*"
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -31,8 +27,11 @@ updates:
       day: monday
       time: "03:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - substance0
     commit-message:
-      prefix: "ci(actions):"
+      # Subjects read "ci(deps): ..."
+      prefix: ci
       include: scope
+    groups:
+      actions:
+        patterns:
+          - "*"

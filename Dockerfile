@@ -1,7 +1,7 @@
 # ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value
 # Node.js scheduler that runs the Claude Code CLI for each pulse
 
-FROM node:24-alpine
+FROM node:25-alpine
 
 # tini forwards signals to the scheduler and reaps pulse subprocesses
 RUN apk add --no-cache tini

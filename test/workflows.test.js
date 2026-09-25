@@ -228,6 +228,16 @@ test("pull requests run the test suite and lint the workflows", () => {
   assert.match(text, /actionlint/);
 });
 
+test("pull requests scan the whole history for secrets with the project rules", () => {
+  const text = read("pr-checks.yml");
+  assert.match(text, /fetch-depth: 0/);
+  assert.match(text, /sha256sum --check/);
+  assert.match(text, /gitleaks git --config \.gitleaks\.toml --redact/);
+  // Without the binary the rule tests would skip, so CI must require it.
+  assert.match(text, /REQUIRE_GITLEAKS: "1"/);
+  assert.match(text, /node --test test\/gitleaks-rules\.test\.js/);
+});
+
 test("pull request checks get a read-only token", () => {
   const text = read("pr-checks.yml");
   assert.match(text, /^permissions:\n\s+contents: read$/m);

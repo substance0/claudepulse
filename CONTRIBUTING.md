@@ -5,70 +5,79 @@ Thank you for your interest in contributing to ClaudePulse! We welcome contribut
 ## How to Contribute
 
 1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit your changes** (`git commit -m 'Add amazing feature'`)
-4. **Push to the branch** (`git push origin feature/amazing-feature`)
-5. **Open a Pull Request**
+2. **Set up your clone** (see [Development Setup](#development-setup))
+3. **Create a feature branch** (`git switch -c feat/window-summary`)
+4. **Commit using [conventional commits](#conventional-commits)**
+5. **Open a pull request against `main`**
 
 ## Development Setup
+
+Requirements: Node.js 22 or later, and the Claude Code CLI on your `PATH` to run pulses locally.
 
 ```bash
 git clone https://github.com/substance0/claudepulse.git
 cd claudepulse
 npm install
-npm run dev
+
+# Secret scanning before each commit (see Secret Scanning below)
+uv tool install pre-commit
+pre-commit install
 ```
 
-## Development Guidelines
+Run the app against your own account with a token from `claude setup-token`:
 
-### Code Style
+```bash
+export CLAUDE_CODE_OAUTH_TOKEN=<token>
+DRY_RUN=true npm start   # print the schedule without sending a pulse
+npm run dev              # run with debug logging
+```
+
+## Checks
+
+Every pull request runs the same checks as below; run them locally before pushing.
+
+```bash
+npm test               # node --test, built-ins only
+npm run check:syntax   # node --check on every source, script and test file
+```
+
+Pull requests also lint the workflow files with actionlint and scan the whole history for secrets.
+
+### Secret Scanning
+
+[gitleaks](https://github.com/gitleaks/gitleaks) runs on each commit through the pre-commit hook, and on every pull request.
+
+- `.gitleaks.toml` adds rules for the two secrets ClaudePulse handles, `CLAUDE_CODE_OAUTH_TOKEN` and Discord webhook URLs, on top of gitleaks' built-in rules. `test/gitleaks-rules.test.js` proves the rules match.
+- `.gitleaksignore` lists findings that need no action, by fingerprint.
+
+If the hook blocks a commit, remove the secret from the staged files. Use an env file (`claudepulse.env`, never committed) instead.
+
+## Development Guidelines
 
 - Follow existing code patterns and conventions
 - Use meaningful variable and function names
 - Add JSDoc comments for public APIs
 - Keep functions focused and single-purpose
-
-### Testing
-
-> [!NOTE]
-> No tests are implemented yet. Use dry run mode to verify configuration.
-
-```bash
-# Run with dry run mode to verify configuration
-DRY_RUN=true npm start
-```
-
-### Code Quality
-
-```bash
-# Lint code (check syntax and style)
-npm run lint
-```
-
-> [!TIP]
-> Run linting before committing to ensure code quality standards
+- Add or update tests with every behaviour change
 
 ### Pull Request Guidelines
 
 - **Clear description**: Explain what your PR does and why
 - **Small focused changes**: Keep PRs focused on a single feature/fix
-- **Update documentation**: Update README.md if needed
-- **Test your changes**: Verify functionality works as expected
-- **Use conventional commits**: Follow conventional commit format for proper versioning
+- **Update documentation**: Update README.md or ENVIRONMENT.md if needed
+- **Green checks**: Tests, workflow lint and secret scan must pass
 
 ## Project Structure
 
-Before contributing, familiarize yourself with the project structure:
-
 ```text
 claudepulse/
-├── .taskmaster/               # Task Master AI project management
-│   ├── tasks/                 # Task definitions and tracking
-│   ├── docs/                  # PRD and planning documents
-│   └── config.json            # Task Master configuration
-├── .mcp.json                  # MCP server configuration (Task Master)
+├── .github/
+│   ├── workflows/             # PR checks, release and image builds
+│   └── dependabot.yml         # Dependency update policy
 ├── assets/                    # Logo and visual assets
-├── docs/                      # Documentation
+├── docker/claude-cli/         # Pinned Claude Code CLI installed in the image
+├── docs/                      # Workflow diagrams
+├── scripts/                   # Build helpers (dev image versions)
 ├── src/                       # Source code
 │   ├── core/                  # Configuration, logging, notifications
 │   ├── features/
@@ -76,139 +85,62 @@ claudepulse/
 │   │   └── scheduling/        # Scheduler and scheduling strategies
 │   └── index.js               # Entry point and composition root
 ├── test/                      # Tests (node --test, no dependencies)
-├── CHANGELOG.md               # Version history
-├── docker-compose.yml         # Container orchestration
+├── .gitleaks.toml             # Secret scanning rules
+├── .pre-commit-config.yaml    # Pre-commit hooks
+├── CHANGELOG.md               # Version history (generated)
+├── docker-compose.yml         # Production-style deployment
+├── docker-compose.dev.yml     # Local build and run
 ├── Dockerfile                 # Container build configuration
 ├── ENVIRONMENT.md             # Environment variables reference
 └── README.md                  # Project documentation
 ```
 
-### Task Management
+## Versioning and Releases
 
-ClaudePulse uses [Task Master AI](https://github.com/cyanheads/task-master-ai) for project task management. All features, improvements, and bugs are tracked as structured tasks.
-
-**MCP Integration:** The project includes a pre-configured `.mcp.json` with the Task Master MCP server, allowing AI assistants like Claude Code to interact with tasks directly through the MCP protocol.
-
-**Viewing Tasks:**
-
-```bash
-# List all tasks (CLI)
-task-master list
-
-# View next available task
-task-master next
-
-# View specific task details
-task-master show <task-id>
-```
-
-**Working with Tasks:**
-
-When contributing, check existing tasks to:
-
-- See what's already planned or in progress
-- Understand task dependencies
-- Align your contribution with project goals
-
-All task files are stored in `.taskmaster/tasks/` and tracked in version control.
-
-## Versioning and Release System
-
-ClaudePulse uses an automated versioning and release system built on semantic versioning and conventional commits.
-
-### Branch Strategy
-
-- **`develop`**: Active development branch - no releases generated
-- **`main`**: Production branch - automatic releases triggered by pushes
+ClaudePulse uses [semantic-release](https://github.com/semantic-release/semantic-release): merging to `main` decides the next version from the commit messages.
 
 ### Conventional Commits
 
 All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```bash
-# Examples
-feat: add OAuth authentication support
-fix: resolve session timeout handling
-docs: update installation instructions
-chore: bump dependencies to latest versions
+feat: announce window reset times on a dedicated Discord webhook
+fix: keep retrying when the Claude CLI exits before reporting usage
+docs: document the release channels
+build(deps): bump @anthropic-ai/claude-code in /docker/claude-cli
 ```
 
-**Commit Types and Version Impact:**
+| Commit                                    | Release           |
+| ----------------------------------------- | ----------------- |
+| `feat:`                                   | minor (2.1.0)     |
+| `fix:`, `perf:`                           | patch (2.0.1)     |
+| `feat!:` or a `BREAKING CHANGE:` footer   | major (3.0.0)     |
+| `docs:`, `chore:`, `ci:`, `build:`, `test:`, `refactor:` | none |
 
-- `feat:` → Minor version bump (1.1.0 → 1.2.0)
-- `fix:` → Patch version bump (1.1.0 → 1.1.1)
-- `BREAKING CHANGE:` → Major version bump (1.1.0 → 2.0.0)
-- `docs:`, `chore:`, `style:` → No version bump
+### What a Merge to `main` Does
 
-### Automated Release Pipeline
+1. **PR Checks** have already passed on the pull request.
+2. **Release** (`release.yml`) runs the tests, then semantic-release. When the commits call for a release it tags `vX.Y.Z`, updates `package.json` and `CHANGELOG.md`, and creates the GitHub Release.
+3. **Image builds** publish to `ghcr.io/substance0/claudepulse`: every commit gets an `edge` image, and a release also gets `latest` and its version tags.
 
-When code is pushed to `main` branch:
+The tags, snapshots of branches and release rebuilds are described in the README's [Release Channels](README.md#release-channels).
 
-1. **semantic-release** analyzes conventional commits
-2. **Version** is automatically determined and updated in `package.json`
-3. **GitHub Release** is created with auto-generated changelog
-4. **Docker Images** are built and published to GitHub Container Registry
-5. **CHANGELOG.md** is automatically updated
+### Workflows
 
-### Release Artifacts
-
-Each release automatically creates:
-
-- **GitHub Release** with semantic version tag (e.g., `v1.2.3`)
-- **Docker Images** published to `ghcr.io/substance0/claudepulse`
-  - `latest` (latest stable release)
-  - `main` (latest main branch)
-  - `v1.2.3` (specific version)
-- **Multi-platform support**: `linux/amd64`, `linux/arm64`
-
-### Development Workflow
-
-```bash
-# 1. Work on feature branch
-git checkout -b feature/new-functionality
-git commit -m "feat: add new functionality"
-
-# 2. Create PR to develop branch
-gh pr create --base develop --title "Add new functionality"
-
-# 3. After review, merge to develop
-# (No releases triggered on develop)
-
-# 4. When ready for release, create PR from develop to main
-gh pr create --base main --title "Release v1.2.0"
-
-# 5. Merge to main triggers automatic release
-# → Version bump, GitHub release, Docker images published
-```
-
-### Manual Release Prevention
-
-To commit without triggering releases, add `[skip ci]` to commit messages:
-
-```bash
-git commit -m "docs: update readme [skip ci]"
-```
-
-### Version Management
-
-- **No hardcoded versions**: All version references are dynamic
-- **Single source of truth**: `package.json` managed by semantic-release
-- **Dynamic badges**: README version badge pulls from GitHub releases API
-
-### Release Configuration
-
-The release system is configured via:
-
-- **`.releaserc.json`**: semantic-release configuration
-- **`.github/workflows/release.yml`**: Release workflow
-- **`.github/workflows/docker-release.yml`**: Docker publishing workflow
+| Workflow                     | Runs on                    | Does                                      |
+| ---------------------------- | -------------------------- | ----------------------------------------- |
+| `pr-checks.yml`              | every pull request         | tests, actionlint, secret scan            |
+| `release.yml`                | push to `main`             | tests, semantic-release, release image    |
+| `docker-edge.yml`            | push to `main`             | `edge` image                              |
+| `docker-snapshot.yml`        | on demand                  | `snapshot-<branch>` image                 |
+| `docker-release-rebuild.yml` | on demand                  | rebuilds a release's image from its tag   |
+| `docker-build.yml`           | called by the image workflows | shared test, build, push and provenance |
 
 ## Need Help?
 
 - 📖 Check the [documentation](README.md)
 - 🐛 [Report bugs](https://github.com/substance0/claudepulse/issues)
 - 💡 [Request features](https://github.com/substance0/claudepulse/issues)
-- 💬 Ask questions in [GitHub Discussions](https://github.com/substance0/claudepulse/discussions)
 
 ## Code of Conduct
 

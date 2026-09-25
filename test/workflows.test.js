@@ -75,13 +75,54 @@ test("edge runs on every push to main", () => {
   assert.match(text, /channel: edge/);
 });
 
-test("callers grant exactly what the build needs", () => {
-  for (const name of ["docker-snapshot.yml", "docker-edge.yml"]) {
-    const text = read(name);
-    for (const permission of CALLER_PERMISSIONS) {
-      assert.match(text, new RegExp(permission), `${name}: ${permission}`);
-    }
+/**
+ * The permissions a job declares, as sorted "scope: level" strings.
+ * Reads the job's own block: from "  <job>:" to the next job at the same
+ * indentation.
+ */
+function jobPermissions(text, job) {
+  const start = text.indexOf(`\n  ${job}:\n`);
+  assert.ok(start > -1, `job ${job} not found`);
+  // Keep the newline that ends "  <job>:" so every key line starts with one
+  const rest = text.slice(start + job.length + 4);
+  const end = rest.search(/\n {2}[a-z][\w-]*:\n/);
+  const block = end === -1 ? rest : rest.slice(0, end);
+  const perms = block.match(/\n {4}permissions:\n((?: {6}[\w-]+: \w+\n)+)/);
+  assert.ok(perms, `job ${job} declares no permissions`);
+  return perms[1].trim().split("\n").map((l) => l.trim()).sort();
+}
+
+test("every caller grants exactly the permissions the build job uses", () => {
+  const build = jobPermissions(read("docker-build.yml"), "build");
+  assert.deepEqual(build, [...CALLER_PERMISSIONS].sort());
+  const callers = [
+    ["docker-snapshot.yml", "image"],
+    ["docker-edge.yml", "image"],
+    ["release.yml", "image"],
+    ["docker-release-rebuild.yml", "image"],
+  ];
+  for (const [name, job] of callers) {
+    assert.deepEqual(jobPermissions(read(name), job), build, `${name} ${job}`);
   }
+});
+
+test("the build rejects a version it could not compute", () => {
+  // An empty or garbled version would publish an empty tag and label
+  const text = read("docker-build.yml");
+  assert.match(text, /Refusing to publish version/);
+});
+
+test("a release image is built only from the tag matching its version", () => {
+  const text = read("docker-build.yml");
+  assert.match(text, /REF: \$\{\{ inputs\.ref \}\}/);
+  assert.match(text, /"\$REF" != "v\$VERSION"/);
+});
+
+test("snapshots are built only from branches whose tag fits Docker's limit", () => {
+  const text = read("docker-build.yml");
+  assert.match(text, /REF_TYPE: \$\{\{ github\.ref_type \}\}/);
+  assert.match(text, /Snapshots are built from branches/);
+  assert.match(text, /-gt 119/);
 });
 
 test("callers never mention latest", () => {

@@ -1,21 +1,19 @@
 # ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value
 # Node.js scheduler that runs the Claude Code CLI for each pulse
 
-FROM node:20-alpine
+FROM node:24-alpine
 
-# Build arguments for version information
-ARG VERSION=unknown
-ARG BUILD_DATE=unknown
-ARG VCS_REF=unknown
+# tini forwards signals to the scheduler and reaps pulse subprocesses
+RUN apk add --no-cache tini
 
-# Reported at startup, so a running container identifies its build
-ENV CLAUDEPULSE_VERSION=${VERSION}
-
-# Install runtime dependencies, including the Claude CLI that pulses run
-RUN apk add --no-cache \
-    tini \
-    && npm install -g @anthropic-ai/claude-code \
-    && claude --version
+# The Claude Code CLI that pulses run, at the version pinned in
+# docker/claude-cli/package-lock.json
+WORKDIR /opt/claude-cli
+COPY docker/claude-cli/package.json docker/claude-cli/package-lock.json ./
+RUN npm ci --omit=dev --no-fund --no-audit && \
+    npm cache clean --force
+ENV PATH="/opt/claude-cli/node_modules/.bin:$PATH"
+RUN claude --version
 
 # Create app directory and non-root user
 RUN addgroup -g 1001 -S claudepulse && \
@@ -33,6 +31,14 @@ RUN npm ci --only=production && \
 
 # Copy application source code LAST (invalidates cache on code changes)
 COPY src/ ./src/
+
+# Build arguments for version information (placed after expensive layers for better caching)
+ARG VERSION=unknown
+ARG BUILD_DATE=unknown
+ARG VCS_REF=unknown
+
+# Reported at startup, so a running container identifies its build
+ENV CLAUDEPULSE_VERSION=${VERSION}
 
 # Set proper ownership and permissions
 RUN chown -R claudepulse:claudepulse /app && \

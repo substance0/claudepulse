@@ -1,0 +1,9 @@
+{
+  "name": "claudepulse-claude-cli",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Claude Code CLI version installed in the ClaudePulse image",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.274"
+  }
+}

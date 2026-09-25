@@ -3,8 +3,7 @@
 .gitignore
 .gitattributes
 
-# Task Master files
-.taskmaster/
+# Assistant instructions
 CLAUDE.md
 
 # VS Code and IDE files
@@ -30,7 +29,6 @@ README.md
 
 # Development and test files
 test-*.mjs
-claude-poc.mjs
 
 # Logs
 *.log
@@ -43,9 +41,6 @@ Thumbs.db
 # Docker files (to avoid copying Dockerfile into itself)
 Dockerfile
 .dockerignore
-
-# MCP config
-.mcp.json
 
 # Runtime data
 pids

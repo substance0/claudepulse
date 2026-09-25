@@ -91,18 +91,18 @@ cd claudepulse
 **Start with Docker Compose:**
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 **💡 Timezone (Optional):** Edit `docker-compose.yml` to set the `TZ` environment variable to your local timezone for better log readability. Default is `UTC`.
 
-**Authentication:** export `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`, see above) in the shell that runs `docker-compose up`, or reference an env file from the service with `env_file:`.
+**Authentication:** export `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`, see above) in the shell that runs `docker compose up`, or reference an env file from the service with `env_file:`.
 
 **Stopping ClaudePulse:**
 
 ```bash
 # Stop the Docker Compose stack
-docker-compose down
+docker compose down
 
 # Or stop individual container
 docker stop claudepulse
@@ -131,7 +131,7 @@ npm start
 
 ```bash
 # Build from Dockerfile
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 # View logs
 docker logs claudepulse-dev

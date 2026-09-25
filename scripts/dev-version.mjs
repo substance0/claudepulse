@@ -13,22 +13,39 @@ import { pathToFileURL } from "node:url";
 
 const CHANNELS = new Set(["dev", "snapshot"]);
 
+/** Finds the last stable release tag; prerelease tags (v*-*) are skipped. */
+export const DESCRIBE_ARGS = [
+  "describe",
+  "--tags",
+  "--long",
+  "--match",
+  "v[0-9]*",
+  "--exclude",
+  "v*-*",
+];
+
 /** Output of `git describe --tags --long`, e.g. v1.0.0-20-g761d7ac */
 const DESCRIBE = /^v?(\d+)\.(\d+)\.(\d+)-(\d+)-g[0-9a-f]+$/;
 
 /**
- * @param {string|null} describe - `git describe --tags --long` output, or null
+ * @param {string|null} describe - `git describe` output, or null when no
+ *   release tag is reachable
  * @param {{channel?: string, commitCount?: number}} [options]
  * @returns {string}
+ * @throws {Error} When describe output is present but not a stable release
  */
 export function devVersion(describe, { channel = "dev", commitCount = 0 } = {}) {
   if (!CHANNELS.has(channel)) {
     throw new Error(`Unknown channel: ${channel}`);
   }
 
-  const match = DESCRIBE.exec((describe ?? "").trim());
-  if (!match) {
+  if (describe === null) {
     return `0.0.1-${channel}.${commitCount}`;
+  }
+
+  const match = DESCRIBE.exec(describe.trim());
+  if (!match) {
+    throw new Error(`Unrecognised git describe output: ${describe}`);
   }
 
   const [, major, minor, patch, since] = match;
@@ -43,7 +60,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const channel = process.argv[2] ?? "dev";
   let describe = null;
   try {
-    describe = git(["describe", "--tags", "--long", "--match", "v[0-9]*"]);
+    describe = git(DESCRIBE_ARGS);
   } catch {
     describe = null;
   }

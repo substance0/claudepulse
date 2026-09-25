@@ -122,7 +122,6 @@ export class PulseScheduler {
     this.timer = null;
     this.consecutiveFailures = 0;
     this.lastSuccessTime = null;
-    this.lastAttemptTime = null;
     this.shutdownRequested = false;
     this.lastScheduledTime = null; // track last planned run start
     this.fixedIntervalMs = 5 * 60 * 60 * 1000; // 5 hours
@@ -182,7 +181,6 @@ export class PulseScheduler {
     this.logger.debug("pulse", "Attempting to send pulse message", {
       dryRun: this.config.dryRun,
     });
-    this.lastAttemptTime = new Date();
 
     if (this.config.dryRun) {
       // Simulate dry run response
@@ -603,22 +601,6 @@ export class PulseScheduler {
         : null,
       consecutiveFailures: this.consecutiveFailures,
     });
-  }
-
-  /**
-   * Get current scheduler status
-   */
-  getStatus() {
-    return {
-      running: this.running,
-      shutdownRequested: this.shutdownRequested,
-      config: this.config,
-      consecutiveFailures: this.consecutiveFailures,
-      lastSuccessTime: this.lastSuccessTime,
-      lastAttemptTime: this.lastAttemptTime,
-      nextRunTime: this.timer ? this.lastScheduledTime : null,
-      rateLimit: this.rateLimit,
-    };
   }
 }
 

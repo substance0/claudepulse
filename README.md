@@ -154,11 +154,20 @@ docker logs claudepulse-dev
 | `snapshot-<branch>`           | on demand, from any branch | testing a branch            |
 | `sha-<commit>`                | every edge and release     | pinning an exact build      |
 
+Right after a release, `edge` still carries the previous line's version
+(e.g. `1.0.1-dev.N` next to a new `2.0.0`), because it is built from the
+commit the release was cut from. Its content matches the release, and the
+next commit on `main` gives it the new line's version.
+
 Build a snapshot of a branch (the branch must contain these workflows, so merge `main` into it first):
 
 ```bash
 gh workflow run docker-snapshot.yml --ref <branch>
+gh workflow run docker-snapshot.yml --ref <branch> -f platforms=linux/amd64,linux/arm64
 ```
+
+Snapshots are built from branches only, and the branch name must be 119
+characters or fewer so that `snapshot-<branch>` fits Docker's tag limit.
 
 Rebuild the image of an existing release, if its build failed:
 

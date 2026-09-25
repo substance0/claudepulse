@@ -37,7 +37,7 @@ function getPackageInfo() {
 /**
  * Generate ASCII banner with project information
  */
-export function generateBanner() {
+function generateBanner() {
   const pkg = getPackageInfo();
   const year = new Date().getFullYear();
 
@@ -83,5 +83,3 @@ ${cyan}╔═══════════════════════�
 export function displayBanner() {
   console.log(generateBanner());
 }
-
-export default { generateBanner, displayBanner };

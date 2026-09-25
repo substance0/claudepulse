@@ -233,24 +233,6 @@ class SchedulingStrategyManager {
   getStrategies() {
     return [...this.strategies];
   }
-
-  /**
-   * Add a custom strategy
-   * @param {SchedulingStrategy} strategy - Strategy instance
-   */
-  addStrategy(strategy) {
-    if (!(strategy instanceof SchedulingStrategy)) {
-      throw new Error("Strategy must extend SchedulingStrategy");
-    }
-    this.strategies.push(strategy);
-    this.strategies.sort((a, b) => a.getPriority() - b.getPriority());
-  }
 }
 
-export {
-  SchedulingStrategy,
-  ScheduledStartStrategy,
-  WindowResetStrategy,
-  DiscoveryStrategy,
-  SchedulingStrategyManager,
-};
+export { SchedulingStrategyManager };

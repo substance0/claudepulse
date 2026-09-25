@@ -8,7 +8,7 @@ import { sendDiscordAlert } from "../services/notificationService.js";
 /**
  * Log levels with numeric values for filtering
  */
-export const LOG_LEVELS = {
+const LOG_LEVELS = {
   ERROR: 0,
   WARN: 1,
   INFO: 2,
@@ -17,12 +17,11 @@ export const LOG_LEVELS = {
 };
 
 /**
- * Performance metrics tracking
+ * Operation timing
  */
 class PerformanceTracker {
   constructor() {
     this.metrics = new Map();
-    this.counters = new Map();
   }
 
   startTimer(operation) {
@@ -53,40 +52,6 @@ class PerformanceTracker {
 
     this.metrics.delete(timerKey);
     return duration;
-  }
-
-  /**
-   * Increment a counter
-   */
-  incrementCounter(name, value = 1) {
-    const current = this.counters.get(name) || 0;
-    this.counters.set(name, current + value);
-  }
-
-  /**
-   * Get counter value
-   */
-  getCounter(name) {
-    return this.counters.get(name) || 0;
-  }
-
-  /**
-   * Get all metrics snapshot
-   */
-  getSnapshot() {
-    return {
-      counters: Object.fromEntries(this.counters),
-      activeTimers: this.metrics.size,
-      timestamp: DateUtility.DateUtility.formatLocalIso(new Date()),
-    };
-  }
-
-  /**
-   * Reset all metrics
-   */
-  reset() {
-    this.metrics.clear();
-    this.counters.clear();
   }
 }
 
@@ -201,8 +166,6 @@ export class Logger {
     // Category-specific formatting for better readability
     switch (category.toLowerCase()) {
       case "start":
-        if (data.version) return `v${data.version}`;
-        if (data.authStatus) return "auth_status_checked";
         return "";
 
       case "config":
@@ -213,98 +176,13 @@ export class Logger {
           .map(([k, v]) => `${k}=${v}`);
         return entries.join(", ");
 
-      case "system":
-        return data.timezone || data.usedTimezone || "";
-
-      case "client":
-        const parts = [];
-        if (data.claudeCliPath) parts.push(`cli=${data.claudeCliPath}`);
-        if (data.credentialsPath) parts.push(`creds=${data.credentialsPath}`);
-        if (data.cliVersion) parts.push(`cli_ver=${data.cliVersion}`);
-        if (
-          data.environmentVariables &&
-          data.environmentVariables.claudeCliPathOverride &&
-          data.environmentVariables.claudeCliPathOverride !== "not set"
-        )
-          parts.push("override=env");
-        return parts.join(", ");
-
-      case "update":
-        const sessions = `${data.activeSessions}/${data.totalSessions} sessions`;
-        const current = data.currentSessionId
-          ? `current=${data.currentSessionId.substring(0, 8)}`
-          : "";
-        const expiry = data.windowExpiry
-          ? `expires=${DateUtility.formatLocalIso(new Date(data.windowExpiry))}`
-          : "";
-        return [sessions, current, expiry].filter(Boolean).join(", ");
-
       case "scheduler":
-        if (data.config) {
-          return `interval=${data.config.intervalHours}h, prompt="${data.config.promptText}", dry_run=${data.config.dryRun}`;
-        }
         if (data.intervalMs) {
           const nextRun = DateUtility.formatLocalIso(
             new Date(data.nextRunTime),
           );
           const strat = data.strategy || "fixed";
           return `next_run=${nextRun}, strategy=${strat}`;
-        }
-        if (data.status === "success") {
-          return "started successfully";
-        }
-        return "";
-
-      case "message": {
-        const parts = [];
-        if (data.requestId !== undefined) parts.push(`req=${data.requestId}`);
-        // request properties
-        const len =
-          typeof data.promptLength === "number"
-            ? data.promptLength
-            : data.prompt
-              ? String(data.prompt).length
-              : undefined;
-        if (typeof len === "number") parts.push(`prompt_len=${len}`);
-        if (data.prompt)
-          parts.push(`prompt="${String(data.prompt).slice(0, 120)}"`);
-        // response properties
-        if (data.sessionId)
-          parts.push(`session=${String(data.sessionId).substring(0, 8)}`);
-        if (data.totalCostUsd !== undefined)
-          parts.push(`cost=$${data.totalCostUsd}`);
-        if (data.durationMs !== undefined)
-          parts.push(`duration=${data.durationMs}ms`);
-        if (data.resultLength !== undefined)
-          parts.push(`resp_len=${data.resultLength}`);
-        if (data.result) {
-          const preview = String(data.result)
-            .replace(/\s+/g, " ")
-            .slice(0, 200);
-          parts.push(
-            `result="${preview}${data.result.length > 200 ? "…" : ""}"`,
-          );
-        }
-        return parts.join(", ");
-      }
-
-      case "auth":
-        if (data.connectionTest && data.connectionTest.success !== undefined) {
-          return data.connectionTest.success
-            ? "connection_test_passed"
-            : "connection_test_failed";
-        }
-        if (typeof data.authenticated === "boolean")
-          return data.authenticated ? "authenticated" : "not_authenticated";
-        // Debug information for credential checks
-        if (data.path) {
-          const parts = [`path=${data.path}`];
-          if (data.error) parts.push(`error="${data.error}"`);
-          if (typeof data.hasCredentialsFile === "boolean")
-            parts.push(`exists=${data.hasCredentialsFile}`);
-          if (typeof data.hasValidOAuth === "boolean")
-            parts.push(`validOAuth=${data.hasValidOAuth}`);
-          return parts.join(", ");
         }
         return "";
 
@@ -329,41 +207,7 @@ export class Logger {
         return parts.join(", ");
       }
 
-      case "ready":
-        return "";
-
-      case "expiry":
-        if (
-          data.cycleStartUTC ||
-          data.hourBoundaryExpiry ||
-          data.firstMessageUTC
-        ) {
-          const parts = [];
-          if (data.cycleStartUTC)
-            parts.push(
-              `start=${DateUtility.formatLocalIso(new Date(data.cycleStartUTC))}`,
-            );
-          if (data.hourBoundaryExpiry)
-            parts.push(
-              `expiry=${DateUtility.formatLocalIso(new Date(data.hourBoundaryExpiry))}`,
-            );
-          if (data.firstMessageUTC)
-            parts.push(
-              `first=${DateUtility.formatLocalIso(new Date(data.firstMessageUTC))}`,
-            );
-          return parts.join(", ");
-        }
-        if (data.reason) return data.reason;
-        if (data.sessionId) return `session=${data.sessionId.substring(0, 8)}`;
-        return "";
-
       case "schedule":
-        if (data.sessionExpiry) {
-          const expiryIso = DateUtility.formatLocalIso(
-            new Date(data.sessionExpiry),
-          );
-          return `session_expires=${expiryIso}`;
-        }
         if (data.planned || data.strategy || data.intervalMs !== undefined) {
           const parts = [];
           if (data.planned)
@@ -377,42 +221,12 @@ export class Logger {
         }
         return "";
 
-      case "ratelimit": {
-        const parts = [];
-        if (data.resetTimeRaw)
-          parts.push(
-            `raw="${String(data.resetTimeRaw).slice(0, 80)}${String(data.resetTimeRaw).length > 80 ? "…" : ""}"`,
-          );
-        if (data.method) parts.push(`method=${data.method}`);
-        const base = data.localIso
-          ? new Date(data.localIso)
-          : new Date(data.resetAt || data.iso || Date.now());
-        parts.push(`at=${DateUtility.formatLocalIso(base)}`);
-        return parts.join(", ");
-      }
-
-      case "cli":
-        if (data.exitCode !== undefined) return `exit=${data.exitCode}`;
-        return "";
-
       case "dry-run":
         if (data.optimalSchedule) {
           const optimal = DateUtility.formatLocalIso(
             new Date(data.optimalSchedule),
           );
           return `scheduled_for=${optimal}`;
-        }
-        return "";
-
-      case "scan":
-        if (data.dir && data.projectCount !== undefined) {
-          return `dir=${data.dir}, projects=${data.projectCount}`;
-        }
-        return "";
-
-      case "files":
-        if (data.projectPath && data.count !== undefined) {
-          return `count=${data.count}, path=${data.projectPath}`;
         }
         return "";
 
@@ -542,7 +356,6 @@ export class Logger {
    * Log error message
    */
   async error(category, message, data = null, metadata = {}) {
-    this.performance.incrementCounter("logs.error");
     this._log(LOG_LEVELS.ERROR, category, message, data, {
       severity: "error",
       ...metadata,
@@ -621,7 +434,6 @@ export class Logger {
    * Log warning message
    */
   warn(category, message, data = null, metadata = {}) {
-    this.performance.incrementCounter("logs.warn");
     this._log(LOG_LEVELS.WARN, category, message, data, {
       severity: "warning",
       ...metadata,
@@ -632,7 +444,6 @@ export class Logger {
    * Log info message
    */
   info(category, message, data = null, metadata = {}) {
-    this.performance.incrementCounter("logs.info");
     this._log(LOG_LEVELS.INFO, category, message, data, {
       severity: "info",
       ...metadata,
@@ -643,7 +454,6 @@ export class Logger {
    * Log debug message
    */
   debug(category, message, data = null, metadata = {}) {
-    this.performance.incrementCounter("logs.debug");
     this._log(LOG_LEVELS.DEBUG, category, message, data, {
       severity: "debug",
       ...metadata,
@@ -651,63 +461,9 @@ export class Logger {
   }
 
   /**
-   * Log trace message
-   */
-  trace(category, message, data = null, metadata = {}) {
-    this.performance.incrementCounter("logs.trace");
-    this._log(LOG_LEVELS.TRACE, category, message, data, {
-      severity: "trace",
-      ...metadata,
-    });
-  }
-
-  /**
-   * Log OAuth authentication events
-   */
-  logAuth(event, success, data = null, metadata = {}) {
-    const level = success ? LOG_LEVELS.INFO : LOG_LEVELS.ERROR;
-    const message = `OAuth ${event} ${success ? "successful" : "failed"}`;
-
-    this.performance.incrementCounter(
-      success ? "auth.success" : "auth.failure",
-    );
-    this._log(level, "auth", message, data, {
-      authEvent: event,
-      authSuccess: success,
-      ...metadata,
-    });
-  }
-
-  /**
-   * Log API call events with timing
-   */
-  logApiCall(method, endpoint, statusCode, duration = null, data = null) {
-    const success = statusCode >= 200 && statusCode < 400;
-    const level = success ? LOG_LEVELS.INFO : LOG_LEVELS.ERROR;
-    const message = `API ${method} ${endpoint} responded with ${statusCode}`;
-
-    this.performance.incrementCounter(success ? "api.success" : "api.failure");
-
-    const metadata = {
-      apiMethod: method,
-      apiEndpoint: endpoint,
-      apiStatusCode: statusCode,
-      apiSuccess: success,
-    };
-
-    if (duration) {
-      metadata.apiDurationMs = duration.ms;
-      metadata.apiDurationNs = duration.ns;
-    }
-
-    this._log(level, "api", message, data, metadata);
-  }
-
-  /**
    * Log scheduler events
    */
   logScheduler(event, data = null, metadata = {}) {
-    this.performance.incrementCounter("scheduler.events");
     this._log(LOG_LEVELS.INFO, "scheduler", `Scheduler ${event}`, data, {
       schedulerEvent: event,
       ...metadata,
@@ -722,27 +478,10 @@ export class Logger {
   }
 
   /**
-   * End timing and optionally log the result
+   * End timing and return the duration
    */
-  endTimer(timerKey, logResult = false, category = "performance") {
-    const duration = this.performance.endTimer(timerKey);
-
-    if (duration && logResult) {
-      this.debug(category, `Operation '${duration.operation}' completed`, {
-        durationMs: duration.ms,
-        durationNs: duration.ns,
-      });
-    }
-
-    return duration;
-  }
-
-  /**
-   * Log performance metrics summary
-   */
-  logMetrics() {
-    const snapshot = this.performance.getSnapshot();
-    this.info("metrics", "Performance metrics snapshot", snapshot);
+  endTimer(timerKey) {
+    return this.performance.endTimer(timerKey);
   }
 
   /**
@@ -783,38 +522,4 @@ export class Logger {
   updateFooter(text) {
     Logger.updateFooter(text);
   }
-
-  /**
-   * Set log level dynamically
-   */
-  setLogLevel(level) {
-    this.logLevel = this._parseLogLevel(level);
-    this.info(
-      "logger",
-      `Log level set to ${Object.keys(LOG_LEVELS).find((key) => LOG_LEVELS[key] === this.logLevel)}`,
-    );
-  }
-
-  /**
-   * Get current configuration
-   */
-  getConfig() {
-    return {
-      logLevel: this.logLevel,
-      logLevelName: Object.keys(LOG_LEVELS).find(
-        (key) => LOG_LEVELS[key] === this.logLevel,
-      ),
-      service: this.service,
-      version: this.version,
-      enableColors: this.enableColors,
-    };
-  }
 }
-
-// Create default logger instance
-const defaultLogger = new Logger({
-  service: "claudepulse",
-  version: "1.0.0",
-});
-
-export default defaultLogger;

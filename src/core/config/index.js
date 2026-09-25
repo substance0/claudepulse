@@ -29,7 +29,7 @@ export function redactConfigSecrets(config) {
   return redacted;
 }
 
-export const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG = {
   PROMPT_TEXT: "pulse check",
   MAX_RETRIES: 3,
   RETRY_BACKOFF_MULTIPLIER: 2,
@@ -50,7 +50,7 @@ export const DEFAULT_CONFIG = {
  * Parse and validate environment variables
  * @returns {Object} Environment configuration object
  */
-export function parseEnvironmentVariables() {
+function parseEnvironmentVariables() {
   return {
     PROMPT_TEXT: process.env.PROMPT_TEXT,
     MAX_RETRIES: process.env.MAX_RETRIES,
@@ -150,10 +150,3 @@ export function validateConfig(config) {
 
   return true;
 }
-
-export default {
-  DEFAULT_CONFIG,
-  loadConfig,
-  validateConfig,
-  parseEnvironmentVariables,
-};

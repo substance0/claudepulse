@@ -20,6 +20,33 @@ updates:
           - "@semantic-release/*"
           - "conventional-changelog-*"
 
+  # The Claude Code CLI installed in the image. Dependabot proposes npm's
+  # latest release; the pin tracks the stable release, so review each bump.
+  - package-ecosystem: npm
+    directory: "/docker/claude-cli"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+    open-pull-requests-limit: 2
+    commit-message:
+      # Subjects read "build(deps): ..."
+      prefix: build
+      include: scope
+
+  # The image's Node base. It floats within its major, so this proposes new
+  # majors only.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: build
+      include: scope
+
   - package-ecosystem: github-actions
     directory: "/"
     schedule:

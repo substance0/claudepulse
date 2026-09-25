@@ -4,43 +4,32 @@
   "description": "Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value",
   "type": "module",
   "main": "src/index.js",
-  "files": [
-    "src/",
-    "Dockerfile",
-    "docker-compose.yml",
-    "README.md",
-    "ENVIRONMENT.md"
-  ],
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test \"test/*.test.js\"",
     "dev": "NODE_ENV=development LOG_LEVEL=DEBUG node src/index.js",
     "prod": "NODE_ENV=production LOG_LEVEL=INFO node src/index.js",
-    "lint": "echo 'Linting JavaScript files...' && find src -name '*.js' -exec node -c {} \\;",
+    "check:syntax": "find src scripts test \\( -name '*.js' -o -name '*.mjs' \\) -exec node --check {} \\;",
     "docker:build": "docker build -t claudepulse . --load",
     "docker:build:fresh": "docker build --no-cache -t claudepulse . --load",
-    "docker:run": "docker run -dt --name claudepulse claudepulse",
-    "docker:run:hold": "docker run -dt --name claudepulse -e KEEP_PULSE_ON_FAILURE=true claudepulse",
-    "docker:run:interactive": "docker run -it --name claudepulse claudepulse",
-    "docker:run:restart": "docker run -dt --name claudepulse --restart unless-stopped claudepulse",
+    "docker:run": "docker run -dt --name claudepulse --env-file claudepulse.env claudepulse",
+    "docker:run:hold": "docker run -dt --name claudepulse --env-file claudepulse.env -e KEEP_PULSE_ON_FAILURE=true claudepulse",
+    "docker:run:interactive": "docker run -it --name claudepulse --env-file claudepulse.env claudepulse",
+    "docker:run:restart": "docker run -dt --name claudepulse --env-file claudepulse.env --restart unless-stopped claudepulse",
     "docker:bash": "docker exec -it claudepulse /bin/sh",
     "docker:start": "docker start claudepulse",
     "docker:stop": "docker stop claudepulse",
     "docker:rm": "docker rm claudepulse",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
     "docker:logs": "docker logs claudepulse",
     "docker:restart": "npm run docker:down && npm run docker:up",
-    "docker:clean": "docker system prune -f && docker image prune -f",
-    "logs": "mkdir -p logs && tail -f logs/claudepulse.log"
+    "docker:clean": "docker rm -f claudepulse; docker image rm claudepulse"
   },
   "keywords": [
     "claude",
     "anthropic",
     "automation",
-    "oauth",
-    "oauth2",
-    "pkce",
     "session",
     "pulse",
     "scheduler",
@@ -66,14 +55,6 @@
     "node": ">=22.0.0",
     "npm": ">=8.0.0"
   },
-  "os": [
-    "darwin",
-    "linux"
-  ],
-  "cpu": [
-    "x64",
-    "arm64"
-  ],
   "devDependencies": {
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/commit-analyzer": "^13.0.0",
@@ -87,10 +68,5 @@
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/claudepulse"
-  },
-  "config": {
-    "logLevel": "INFO",
-    "defaultInterval": "5",
-    "maxRetries": "3"
   }
 }

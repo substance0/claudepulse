@@ -1,0 +1,20 @@
+# Secret scanning rules for gitleaks: the built-in rules plus the two secrets
+# ClaudePulse runs with, which the built-in rules do not recognise.
+# test/gitleaks-rules.test.js proves these rules match.
+
+title = "ClaudePulse gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "claude-code-oauth-token"
+description = "Claude Code OAuth token, as printed by `claude setup-token`"
+regex = '''sk-ant-oat01-[A-Za-z0-9_-]{20,}'''
+keywords = ["sk-ant-oat01-"]
+
+[[rules]]
+id = "discord-webhook-url"
+description = "Discord webhook URL; anyone holding it can post to the channel"
+regex = '''https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{60,}'''
+keywords = ["/api/webhooks/"]

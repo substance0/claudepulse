@@ -1,0 +1,8 @@
+# Findings gitleaks reports but that need no action. One fingerprint per line.
+# Claude OAuth tokens committed in the initial commit; revoked long before
+# this file existed, and the history is kept as is.
+994d2b169753915b3712a824217891edf4d2a058:oauth linux investigation.txt:claude-code-oauth-token:9
+994d2b169753915b3712a824217891edf4d2a058:oauth linux investigation.txt:claude-code-oauth-token:32
+994d2b169753915b3712a824217891edf4d2a058:oauth linux investigation.txt:claude-code-oauth-token:52
+994d2b169753915b3712a824217891edf4d2a058:oauth linux investigation.txt:claude-code-oauth-token:72
+994d2b169753915b3712a824217891edf4d2a058:oauth linux investigation.txt:claude-code-oauth-token:102

@@ -179,3 +179,25 @@ test("a snapshot can be built for every platform on demand", () => {
   assert.match(text, /default: linux\/amd64\n/);
   assert.match(text, /platforms: \$\{\{ inputs\.platforms \}\}/);
 });
+
+test("pull requests run the test suite and lint the workflows", () => {
+  const text = read("pr-checks.yml");
+  assert.match(text, /^on:\n\s+pull_request:/m);
+  assert.match(text, /run: npm test/);
+  assert.match(text, /actionlint/);
+});
+
+test("pull request checks get a read-only token", () => {
+  const text = read("pr-checks.yml");
+  assert.match(text, /^permissions:\n\s+contents: read$/m);
+  assert.doesNotMatch(text, /pull_request_target/);
+  assert.doesNotMatch(text, /secrets\./);
+});
+
+test("Dependabot never proposes an odd-numbered Node major", () => {
+  const text = fs.readFileSync(".github/dependabot.yml", "utf8");
+  for (const major of [25, 27, 29]) {
+    assert.match(text, new RegExp(`"~> ${major}\\.0"`), `node ${major}`);
+  }
+  assert.match(text, /dependency-name: node/);
+});

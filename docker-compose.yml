@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   claudepulse:
     # Pull pre-built image from GitHub Container Registry

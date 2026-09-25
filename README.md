@@ -10,7 +10,7 @@
 **ClaudePulse maintains a steady pulse on your Claude Pro/Max sessions, automatically triggering new 5-hour cycles at reset boundaries to ensure you get every coding hour you pay for. Keep your development flow uninterrupted – ClaudePulse pulses in the background so you're always ready to code at full capacity.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Version](https://img.shields.io/github/v/release/substance0/claudepulse)](https://github.com/substance0/claudepulse/releases)
 

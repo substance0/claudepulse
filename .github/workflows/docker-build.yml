@@ -64,14 +64,37 @@ jobs:
         env:
           CHANNEL: ${{ inputs.channel }}
           VERSION: ${{ inputs.version }}
+          REF: ${{ inputs.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           case "$CHANNEL" in
             snapshot|edge|release) ;;
             *) echo "Unknown channel: $CHANNEL" >&2; exit 1 ;;
           esac
-          if [ "$CHANNEL" = release ] && ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "The release channel needs version X.Y.Z, got '$VERSION'" >&2
-            exit 1
+          if [ "$CHANNEL" = release ]; then
+            if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "The release channel needs version X.Y.Z, got '$VERSION'" >&2
+              exit 1
+            fi
+            # The image is tagged VERSION, so it must be built from that tag.
+            if [ "$REF" != "v$VERSION" ]; then
+              echo "Release $VERSION must be built from tag v$VERSION, got '$REF'" >&2
+              exit 1
+            fi
+          fi
+          if [ "$CHANNEL" = snapshot ]; then
+            # The image is tagged snapshot-<branch>; tags and other refs have
+            # no branch to name it after.
+            if [ "$REF_TYPE" != branch ]; then
+              echo "Snapshots are built from branches, got $REF_TYPE '$REF_NAME'" >&2
+              exit 1
+            fi
+            # Docker tags stop at 128 characters, "snapshot-" included.
+            if [ "${#REF_NAME}" -gt 119 ]; then
+              echo "Branch name is ${#REF_NAME} characters; snapshots need 119 or fewer" >&2
+              exit 1
+            fi
           fi
 
       - name: Checkout
@@ -94,6 +117,10 @@ jobs:
             snapshot) v="$(node scripts/dev-version.mjs snapshot)" ;;
             *)        v="$(node scripts/dev-version.mjs dev)" ;;
           esac
+          if ! printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "Refusing to publish version '$v'" >&2
+            exit 1
+          fi
           base="${v%%-*}"
           {
             echo "version=$v"

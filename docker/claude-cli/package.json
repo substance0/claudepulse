@@ -4,6 +4,6 @@
   "private": true,
   "description": "The Claude Code CLI version installed in the ClaudePulse image",
   "dependencies": {
-    "@anthropic-ai/claude-code": "2.1.274"
+    "@anthropic-ai/claude-code": "2.1.278"
   }
 }

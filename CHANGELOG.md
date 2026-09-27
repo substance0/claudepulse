@@ -1,3 +1,18 @@
+# [2.1.0](https://github.com/substance0/claudepulse/compare/v2.0.0...v2.1.0) (2026-09-27)
+
+
+### Bug Fixes
+
+* label the shutdown log line with the account ([ea9549c](https://github.com/substance0/claudepulse/commit/ea9549c5e3e53515d07279233f36a19216f3fbc8))
+* trim spaces around ACCOUNT_LABEL ([8559c69](https://github.com/substance0/claudepulse/commit/8559c69c677959c7fd7eae8edb24876f81c571e4))
+
+
+### Features
+
+* label window notifications with the account ([83ba0af](https://github.com/substance0/claudepulse/commit/83ba0af190f0c2595fefcb8dcc1b7d8270757857))
+* read and validate an optional ACCOUNT_LABEL ([d693846](https://github.com/substance0/claudepulse/commit/d693846967ad5a423848c418e2bf3fbe51757c74))
+* show the account label in log lines and error alerts ([9a1f536](https://github.com/substance0/claudepulse/commit/9a1f536e75578855c8672b4f8d36f5cb3936e8ce))
+
 # [2.0.0](https://github.com/substance0/claudepulse/compare/v1.0.0...v2.0.0) (2026-09-24)
 
 

@@ -14,9 +14,9 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 
-function setupShutdownHandlers(heartbeatInterval, scheduler) {
+function setupShutdownHandlers(heartbeatInterval, scheduler, label) {
   const shutdown = (signal) => {
-    const logger = new Logger({ service: "claudepulse-shutdown" });
+    const logger = new Logger({ service: "claudepulse-shutdown", label });
     logger.disableFooter();
     logger.info("shutdown", `Received ${signal} signal`);
     if (heartbeatInterval) clearInterval(heartbeatInterval);
@@ -192,7 +192,7 @@ async function main() {
     }
 
     const { scheduler, heartbeatInterval } = result;
-    setupShutdownHandlers(heartbeatInterval, scheduler);
+    setupShutdownHandlers(heartbeatInterval, scheduler, config.ACCOUNT_LABEL);
     setupProcessErrorHandlers(scheduler, config);
   } catch (error) {
     // Always try console.error first as absolute fallback

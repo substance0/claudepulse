@@ -92,3 +92,86 @@ export function workHoursErrors(config) {
 
   return errors;
 }
+
+const HOUR_MS = 60 * 60 * 1000;
+const WINDOW_HOURS = 5;
+/** Second of the minute pulses fire at, clear of the reset boundary. */
+const PULSE_SECOND = 10;
+/** Working days searched ahead: enough to reach any day of the week. */
+const SEARCH_DAYS = 8;
+
+/** The given day at a clock time. */
+function atClock(day, clock) {
+  const d = new Date(day);
+  d.setHours(clock.hour, clock.minute, 0, 0);
+  return d;
+}
+
+/** Round up to the next full hour, unless already on one. */
+function ceilToHour(date) {
+  const d = new Date(date);
+  if (d.getMinutes() || d.getSeconds() || d.getMilliseconds()) {
+    d.setHours(d.getHours() + 1, 0, 0, 0);
+  }
+  return d;
+}
+
+/**
+ * Build the work-hours rules.
+ * @param {{start: {hour: number, minute: number}, end: {hour: number, minute: number}, hoursLeft: number, days: Set<number>}} settings
+ * @returns {{nextAllowed: (t: Date) => Date, isActive: (t: Date) => boolean}}
+ */
+export function createWorkHours({ start, end, hoursLeft, days }) {
+  /** First pulse of a working day, so hoursLeft hours remain at start. */
+  function dayStartPulse(workDay) {
+    const targetReset = ceilToHour(
+      new Date(atClock(workDay, start).getTime() + hoursLeft * HOUR_MS),
+    );
+    const pulse = new Date(targetReset);
+    pulse.setHours(pulse.getHours() - WINDOW_HOURS, 0, PULSE_SECOND, 0);
+    return pulse;
+  }
+
+  /**
+   * The earliest time at or after t inside an active period.
+   * @param {Date} t
+   * @returns {Date}
+   */
+  function nextAllowed(t) {
+    for (let offset = -1; offset <= SEARCH_DAYS; offset++) {
+      const workDay = new Date(t);
+      workDay.setHours(12, 0, 0, 0);
+      workDay.setDate(workDay.getDate() + offset);
+      if (!days.has(workDay.getDay())) continue;
+
+      const periodStart = dayStartPulse(workDay);
+      const periodEnd = atClock(workDay, end);
+      if (t < periodEnd) {
+        return t >= periodStart ? new Date(t) : periodStart;
+      }
+    }
+    throw new Error("No working day found in WORK_DAYS");
+  }
+
+  return {
+    nextAllowed,
+    isActive: (t) => nextAllowed(t).getTime() === t.getTime(),
+  };
+}
+
+/**
+ * Build the work-hours rules from validated configuration.
+ * @param {Object} config - Configuration that passed workHoursErrors()
+ * @returns {ReturnType<typeof createWorkHours>|null} Null when WORK_START is unset
+ */
+export function createWorkHoursFromConfig(config) {
+  if (config.WORK_START === undefined) {
+    return null;
+  }
+  return createWorkHours({
+    start: parseClock(config.WORK_START),
+    end: parseClock(config.WORK_END),
+    hoursLeft: Number(config.HOURS_LEFT_AT_START ?? WINDOW_HOURS),
+    days: parseWorkDays(config.WORK_DAYS ?? "Mon-Sun"),
+  });
+}

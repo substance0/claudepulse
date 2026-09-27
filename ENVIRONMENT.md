@@ -12,6 +12,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `RETRY_BACKOFF_MULTIPLIER`   | Number  | `2`             | Exponential backoff multiplier (1.0-5.0)        |
 | `MAX_BACKOFF_MINUTES`        | Number  | `30`            | Maximum retry delay in minutes (1-300)          |
 | `LOG_LEVEL`                  | String  | `INFO`          | Logging verbosity (ERROR/WARN/INFO/DEBUG/TRACE) |
+| `ACCOUNT_LABEL`              | String  | `unset`         | Name shown in logs and Discord messages         |
 | `DRY_RUN`                    | Boolean | `false`         | Test mode - analyze schedule without sending    |
 | `KEEP_PULSE_ON_FAILURE`      | Boolean | `false`         | Keep container running on auth failures         |
 | `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Pulse at startup to learn the current window    |
@@ -359,6 +360,22 @@ reset time is visible from a phone.
   touching error alerts.
 - A failed announcement is logged as a warning and never affects pulsing.
 - The URL is masked as `[REDACTED]` in the startup configuration log.
+
+---
+
+### `ACCOUNT_LABEL`
+
+**Purpose:** Tell several ClaudePulse containers apart, one per account.
+
+**Type:** String, 1-32 letters, digits, spaces, dots, underscores or hyphens
+**Default:** Unset (no label)
+
+When set, log lines read `[INFO] [work] [PULSE] …`, error alerts are titled
+`🚨 claudepulse (work) Error`, and window notifications `work · Window open`.
+
+```bash
+ACCOUNT_LABEL=work
+```
 
 ---
 

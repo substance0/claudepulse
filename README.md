@@ -152,6 +152,7 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 | Variable                     | Default       | Description                                                            |
 | ---------------------------- | ------------- | ---------------------------------------------------------------------- |
 | `TZ`                         | `UTC`         | Time zone for logs and `SCHEDULED_START_HOUR`                          |
+| `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
 | `SCHEDULED_START_HOUR`       | unset         | Hour (0-23) of the first pulse; later pulses follow the window         |
 | `LOG_LEVEL`                  | `INFO`        | Logging verbosity (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)          |
 | `DRY_RUN`                    | `false`       | Print the schedule and exit without sending a pulse                    |
@@ -187,6 +188,34 @@ To set one up:
 3. **Recreate the container** so it reads the new value, as for an upgrade.
 
 See [ENVIRONMENT.md](ENVIRONMENT.md#discord_webhook_url) to send a test alert.
+
+### Several Accounts
+
+Run one container per account, each with its own env file and label:
+
+```yaml
+services:
+  claudepulse-work:
+    image: ghcr.io/substance0/claudepulse:latest
+    container_name: claudepulse-work
+    environment:
+      - TZ=Europe/Paris
+      - ACCOUNT_LABEL=work
+    env_file:
+      - work.env
+    restart: unless-stopped
+  claudepulse-personal:
+    image: ghcr.io/substance0/claudepulse:latest
+    container_name: claudepulse-personal
+    environment:
+      - TZ=Europe/Paris
+      - ACCOUNT_LABEL=personal
+    env_file:
+      - personal.env
+    restart: unless-stopped
+```
+
+Both can share Discord webhooks: every message starts with its account's label.
 
 ## Image Tags
 

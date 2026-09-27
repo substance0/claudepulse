@@ -24,6 +24,7 @@ README.md
 
 # Environment files
 .env
+claudepulse.env
 .env.local
 .env.example
 

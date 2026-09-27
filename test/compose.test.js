@@ -27,3 +27,10 @@ test("compose files never set a secret under environment", () => {
     }
   }
 });
+
+test("the env file is never committed or sent to a build", () => {
+  for (const name of [".gitignore", ".dockerignore"]) {
+    const text = fs.readFileSync(name, "utf8");
+    assert.match(text, /^claudepulse\.env$/m, name);
+  }
+});

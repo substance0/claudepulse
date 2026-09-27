@@ -9,8 +9,9 @@ dev-debug.log
 # Dependency directories
 node_modules/
 
-# Environment variables
+# Environment variables and secrets
 .env
+claudepulse.env
 
 # Editor directories and files
 .idea

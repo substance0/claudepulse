@@ -215,7 +215,7 @@ services:
     restart: unless-stopped
 ```
 
-Both can share Discord webhooks: every message starts with its account's label.
+Both can share Discord webhooks: every message names its account.
 
 ## Image Tags
 

@@ -66,6 +66,7 @@ export class Logger {
     this.service = options.service || "claudepulse";
     this.version = options.version || "1.0.0";
     this.discordWebhookUrl = options.discordWebhookUrl || undefined;
+    this.label = options.label || undefined;
 
     // Color control: honor NO_COLOR/FORCE_COLOR, then fallback to TTY detection
     const envForceColor = (process.env.FORCE_COLOR || "")
@@ -301,7 +302,8 @@ export class Logger {
     // Inline format with optional colors
     const color = this.enableColors ? this._getLevelColor(level) : "";
     const reset = this.enableColors ? "\x1b[0m" : "";
-    const prefix = `${color}[${timestamp}] [${levelName}] [${category.toUpperCase()}]${reset}`;
+    const labelPart = this.label ? ` [${this.label}]` : "";
+    const prefix = `${color}[${timestamp}] [${levelName}]${labelPart} [${category.toUpperCase()}]${reset}`;
 
     let output = `${prefix} ${message}`;
     if (data !== null && data !== undefined) {
@@ -416,7 +418,9 @@ export class Logger {
       // Send Discord alert (non-blocking)
       sendDiscordAlert(
         {
-          title: `🚨 ${this.service} Error`,
+          title: this.label
+            ? `🚨 ${this.service} (${this.label}) Error`
+            : `🚨 ${this.service} Error`,
           description: message,
           level: "ERROR",
           fields,
@@ -495,6 +499,7 @@ export class Logger {
       enableColors: this.enableColors,
       // Without this, alerts raised through a child logger are dropped.
       discordWebhookUrl: this.discordWebhookUrl,
+      label: this.label,
     });
 
     // Override the _log method to include additional context

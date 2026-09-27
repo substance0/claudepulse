@@ -18,18 +18,15 @@ services:
 
       # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-
-      # Discord webhook for error alerts (optional)
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-
-      # Discord webhook announcing each window's reset time (optional). Use a
-      # channel of its own, so it can be muted without muting error alerts.
-      - DISCORD_WINDOW_WEBHOOK_URL=${DISCORD_WINDOW_WEBHOOK_URL}
-
-      # Token from `claude setup-token`; Claude Code reads it on each pulse.
-      # An env_file keeps it out of the compose file. Docker still copies its
-      # values into the container config, so docker inspect shows them.
-      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+    # Secrets, one per line, next to this file (chmod 600):
+    #   CLAUDE_CODE_OAUTH_TOKEN=...      required, from `claude setup-token`
+    #   DISCORD_WEBHOOK_URL=...          optional, error alerts
+    #   DISCORD_WINDOW_WEBHOOK_URL=...   optional, window reset announcements
+    # Keep them out of `environment:` above: its values override this file.
+    # The env file keeps secrets out of the compose file and shell history;
+    # Docker still copies them into the container config (docker inspect).
+    env_file:
+      - claudepulse.env
     labels:
       - "com.claudepulse.service=claudepulse"
       - "com.claudepulse.description=ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value"

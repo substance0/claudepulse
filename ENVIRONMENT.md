@@ -274,7 +274,8 @@ claude setup-token
 
 The command prints the token once and saves it nowhere. It is valid for one
 year. Supply it from a file rather than inline, so it stays out of shell
-history, `docker inspect` output and stack listings:
+history and the compose file. Docker still copies env file values into the
+container configuration, so anyone who can run `docker inspect` can read it:
 
 ```yaml
 services:
@@ -314,23 +315,14 @@ it is not exposed to anyone reading container logs.
 1. Create a webhook in Discord:
    - Server Settings → Integrations → Webhooks → New Webhook
    - Copy the webhook URL
-2. Add to ClaudePulse environment:
+2. Add it to `claudepulse.env`, next to the token, then recreate the container:
    ```bash
-   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN
+   echo "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN" >> claudepulse.env
    ```
 
-**Example:**
-
-```bash
-# Docker run
-docker run -d --name claudepulse \
-  -e DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/123456789/abcdefg \
-  ghcr.io/substance0/claudepulse:latest
-
-# Docker Compose
-environment:
-  - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/123456789/abcdefg
-```
+The webhook URL is a secret: anyone holding it can post to the channel. Keep
+it in the env file, not in `-e` flags or a compose file's `environment:`,
+which would also override the env file's value.
 
 **Testing:**
 
@@ -405,6 +397,7 @@ docker run -d --name claudepulse \
   -e LOG_LEVEL=INFO \
   -e MAX_RETRIES=3 \
   -e PROMPT_TEXT="ping" \
+  --restart unless-stopped \
   --env-file claudepulse.env \
   ghcr.io/substance0/claudepulse:latest
 ```

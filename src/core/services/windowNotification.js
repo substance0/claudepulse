@@ -63,16 +63,22 @@ export function buildWindowNotification(pulseResult) {
 /**
  * Create a notifier that posts window announcements to one webhook.
  * @param {string} webhookUrl - Discord webhook for window announcements
- * @param {{send?: Function}} [deps] - Override the Discord sender (tests)
+ * @param {{send?: Function, label?: string}} [options] - Discord sender
+ *   (overridable in tests) and the account label prefixed to titles
  * @returns {{notify: (pulseResult: Object) => Promise<void>}}
  */
-export function createWindowNotifier(webhookUrl, { send = sendDiscordAlert } = {}) {
+export function createWindowNotifier(
+  webhookUrl,
+  { send = sendDiscordAlert, label } = {},
+) {
   return {
     async notify(pulseResult) {
       const payload = buildWindowNotification(pulseResult);
-      if (payload) {
-        await send(payload, webhookUrl);
+      if (!payload) {
+        return;
       }
+      const title = label ? `${label} · ${payload.title}` : payload.title;
+      await send({ ...payload, title }, webhookUrl);
     },
   };
 }

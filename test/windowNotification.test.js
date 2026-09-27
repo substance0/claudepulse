@@ -75,3 +75,38 @@ test("the notifier stays silent when there is nothing to announce", async () => 
 
   assert.deepEqual(sent, []);
 });
+
+test("prefixes the title with the account label", async () => {
+  const sent = [];
+  const notifier = createWindowNotifier("https://discord.test/hook", {
+    label: "work",
+    send: async (payload) => sent.push(payload),
+  });
+
+  await notifier.notify(allowedPulse());
+
+  assert.equal(sent[0].title, "work · Window open");
+});
+
+test("keeps the plain title without a label", async () => {
+  const sent = [];
+  const notifier = createWindowNotifier("https://discord.test/hook", {
+    send: async (payload) => sent.push(payload),
+  });
+
+  await notifier.notify(allowedPulse());
+
+  assert.equal(sent[0].title, "Window open");
+});
+
+test("a labelled notifier still sends nothing for a pulse with no window", async () => {
+  const sent = [];
+  const notifier = createWindowNotifier("https://discord.test/hook", {
+    label: "work",
+    send: async (payload) => sent.push(payload),
+  });
+
+  await notifier.notify({ success: false, rateLimit: null });
+
+  assert.deepEqual(sent, []);
+});

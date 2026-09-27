@@ -32,6 +32,7 @@ function setupProcessErrorHandlers(scheduler, config) {
   const errLogger = new Logger({
     service: "claudepulse-error",
     discordWebhookUrl: config?.DISCORD_WEBHOOK_URL,
+    label: config?.ACCOUNT_LABEL,
   });
 
   const handleFatal = async (type, err) => {
@@ -84,7 +85,9 @@ async function runScheduler(config, logger) {
   // 3. Create PulseScheduler with all dependencies. Window announcements are
   // sent only when their own webhook is configured.
   const notifier = config.DISCORD_WINDOW_WEBHOOK_URL
-    ? createWindowNotifier(config.DISCORD_WINDOW_WEBHOOK_URL)
+    ? createWindowNotifier(config.DISCORD_WINDOW_WEBHOOK_URL, {
+        label: config.ACCOUNT_LABEL,
+      })
     : undefined;
 
   const scheduler = new PulseScheduler({
@@ -150,6 +153,7 @@ async function main() {
     const logger = new Logger({
       service: "claudepulse",
       discordWebhookUrl: config.DISCORD_WEBHOOK_URL,
+      label: config.ACCOUNT_LABEL,
     });
 
     logger.info(

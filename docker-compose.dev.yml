@@ -20,7 +20,6 @@ services:
 
       # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - NODE_ENV=${NODE_ENV:-production}
 
       # Discord webhook for error alerts (optional)
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}

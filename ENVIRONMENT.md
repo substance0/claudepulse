@@ -12,7 +12,6 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `RETRY_BACKOFF_MULTIPLIER`   | Number  | `2`             | Exponential backoff multiplier (1.0-5.0)        |
 | `MAX_BACKOFF_MINUTES`        | Number  | `30`            | Maximum retry delay in minutes (1-300)          |
 | `LOG_LEVEL`                  | String  | `INFO`          | Logging verbosity (ERROR/WARN/INFO/DEBUG/TRACE) |
-| `NODE_ENV`                   | String  | `production`    | Environment mode (development/production/test)  |
 | `DRY_RUN`                    | Boolean | `false`         | Test mode - analyze schedule without sending    |
 | `KEEP_PULSE_ON_FAILURE`      | Boolean | `false`         | Keep container running on auth failures         |
 | `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Pulse at startup to learn the current window    |
@@ -189,24 +188,6 @@ LOG_LEVEL=DEBUG    # Development/troubleshooting
 ```
 
 **Log Format:** Inline text format (human-readable). Colors auto-enabled for TTY output.
-
----
-
-### `NODE_ENV`
-
-**Purpose:** Application environment mode.
-
-**Type:** String
-**Default:** `production`
-**Valid Values:** `development`, `production`, `test`
-
-**Effects:**
-
-| Mode          | Error Handling | Debug Info | Use Case              |
-| ------------- | -------------- | ---------- | --------------------- |
-| `development` | Verbose        | Enabled    | Local development     |
-| `production`  | Compact        | Minimal    | Production deployment |
-| `test`        | Silent         | Reduced    | Automated testing     |
 
 ---
 
@@ -443,7 +424,6 @@ services:
       - LOG_LEVEL=INFO
       - MAX_RETRIES=3
       - PROMPT_TEXT=ping
-      - NODE_ENV=production
     env_file:
       - claudepulse.env # CLAUDE_CODE_OAUTH_TOKEN=...
     restart: unless-stopped
@@ -492,7 +472,6 @@ docker logs claudepulse | grep -i "schedule\|next run"
 
 ```bash
 LOG_LEVEL=WARN      # Reduce verbosity
-NODE_ENV=production # Optimize output
 ```
 
 ---

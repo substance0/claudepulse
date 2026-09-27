@@ -123,7 +123,31 @@ build(deps): bump @anthropic-ai/claude-code in /docker/claude-cli
 2. **Release** (`release.yml`) runs the tests, then semantic-release. When the commits call for a release it tags `vX.Y.Z`, updates `package.json` and `CHANGELOG.md`, and creates the GitHub Release.
 3. **Image builds** publish to `ghcr.io/substance0/claudepulse`: every commit gets an `edge` image, and a release also gets `latest` and its version tags.
 
-The tags, snapshots of branches and release rebuilds are described in the README's [Release Channels](README.md#release-channels).
+The published tags are listed in the README's [Image Tags](README.md#image-tags).
+
+### Image Builds
+
+Right after a release, `edge` still carries the previous line's version
+(e.g. `1.0.1-dev.N` next to a new `2.0.0`), because it is built from the
+commit the release was cut from. Its content matches the release, and the
+next commit on `main` gives it the new line's version.
+
+Build a `snapshot-<branch>` image to test a branch before merging. The branch
+must contain these workflows, so merge `main` into it first:
+
+```bash
+gh workflow run docker-snapshot.yml --ref <branch>
+gh workflow run docker-snapshot.yml --ref <branch> -f platforms=linux/amd64,linux/arm64
+```
+
+Snapshots are built from branches only, and the branch name must be 119
+characters or fewer so that `snapshot-<branch>` fits Docker's tag limit.
+
+Rebuild the image of an existing release, if its build failed:
+
+```bash
+gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
+```
 
 ### Workflows
 

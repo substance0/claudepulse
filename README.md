@@ -7,23 +7,23 @@
 
 # ClaudePulse
 
-**ClaudePulse maintains a steady pulse on your Claude Pro/Max sessions, automatically triggering new 5-hour cycles at reset boundaries to ensure you get every coding hour you pay for. Keep your development flow uninterrupted – ClaudePulse pulses in the background so you're always ready to code at full capacity.**
+**Starts each new Claude Pro/Max 5-hour window right after the previous one resets, so the hours you pay for are already running when you sit down to code.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Version](https://img.shields.io/github/v/release/substance0/claudepulse)](https://github.com/substance0/claudepulse/releases)
+[![Docker Edge](https://github.com/substance0/claudepulse/actions/workflows/docker-edge.yml/badge.svg)](https://github.com/substance0/claudepulse/actions/workflows/docker-edge.yml)
 
-[Installation](#installation) • [Features](#features) • [Configuration](#configuration) • [Support](#support) • [Changelog](#changelog) • [Contributing](#contributing) • [Licence](#licence)
+[How It Works](#how-it-works) • [Installation](#installation) • [Operating](#operating) • [Configuration](#configuration) • [Image Tags](#image-tags) • [Support](#support) • [License](#license)
 
 </div>
 
 ## At a Glance
 
-Here's the thing: Claude Code's 5-hour windows don't reset automatically when they expire. Each new window only starts when you send your first prompt after the reset time. The next limit is then computed based on your first prompt's hour (rounded down) + 5 hours. Miss that window, and you could lose precious coding hours when you finally sit down to work.
+Claude's 5-hour windows don't start on their own when the previous one resets. A new window only starts with your first prompt after the reset, and it ends 5 hours after that prompt's hour, rounded down. If you come back to your desk late, the window starts late too.
 
 > [!WARNING]
-> The "5-hour limit" can trigger before 5 actual hours due to token limits or other Claude-specific thresholds. See more details [on Claude's website](https://support.claude.com/en/articles/8324991-about-claude-s-pro-plan-usage).
+> The "5-hour limit" can trigger before 5 actual hours due to token limits or other Claude-specific thresholds. See more details [on Claude's website](https://support.claude.com/en/articles/11647753-how-do-usage-and-length-limits-work).
 
 ### Real-World Scenario
 
@@ -35,219 +35,187 @@ Here's the thing: Claude Code's 5-hour windows don't reset automatically when th
 | **2:10 PM**  | 💼 Still in meetings...                                                  | ✅ **ClaudePulse sends pulse automatically**                             |
 | **4:00 PM**  | 😞 Ready to code, but window starts NOW<br>_(Lost 2 hours you paid for)_ | 😎 Ready to code with **3h remaining**<br>_(Maximum subscription value)_ |
 
+## How It Works
+
+1. **A pulse** runs Claude Code once (`claude -p`) on the cheapest model, with thinking disabled and an isolated configuration, so it costs as little as possible.
+2. **Claude Code reports when the current window resets.** ClaudePulse schedules the next pulse just after that time, so one pulse per window is enough.
+3. **At startup**, ClaudePulse pulses right away to learn the current window, or waits for `SCHEDULED_START_HOUR` if you set one. Until a window is known, it pulses hourly.
+
+See the [workflow diagrams](docs/workflow-diagrams.md) for the full scheduling logic.
+
+## Features
+
+| Feature                     | Description                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Window-Aware Scheduling** | Follows the reported window reset, waits out usage limits, and respects a configured start hour ([strategies](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
+| **Window Notifications**    | Optional Discord message each time a window opens or the usage limit is reached, with the reset time in your local time zone        |
+| **Spaced Failure Alerts**   | Optional Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so an outage stays visible without flooding the channel |
+| **Retry with Backoff**      | Exponential backoff (configurable multiplier and maximum delay) for transient failures; authentication failures are not retried     |
+| **No Stored Credentials**   | Claude Code authenticates each pulse from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse keeps no credentials and no state                  |
+| **Small, Verifiable Image** | No npm runtime dependencies, a pinned Claude Code CLI, `linux/amd64` and `linux/arm64` builds, and signed build provenance         |
+
 ## Installation
 
-<details open>
-<summary><strong>🐳 Docker Registry (Recommended)</strong></summary>
+All installation paths read secrets from a `claudepulse.env` file. Create it once.
 
-**Authentication (once):** ClaudePulse runs Claude Code for each pulse, and Claude Code authenticates itself. Generate a long-lived token on any machine with a browser:
+**1. Generate a token** on any machine with a browser. It is valid for one year:
 
 ```bash
 claude setup-token
 ```
 
-It prints the token once and saves it nowhere. Store it in an env file, readable only by you:
+**2. Store it in `claudepulse.env`**, readable only by you. The command prints the token once and saves it nowhere:
 
 ```bash
 echo "CLAUDE_CODE_OAUTH_TOKEN=<token>" > claudepulse.env && chmod 600 claudepulse.env
 ```
 
-**Run:**
+The env file keeps the token out of your shell history and compose files. Docker still copies its values into the container configuration, so anyone who can run `docker inspect` on the host can read it.
+
+<details open>
+<summary><strong>🐳 Docker (Recommended)</strong></summary>
 
 ```bash
-docker run -d --name claudepulse -e TZ=America/New_York --env-file claudepulse.env ghcr.io/substance0/claudepulse:latest
+docker run -d --name claudepulse --restart unless-stopped \
+  -e TZ=America/New_York \
+  --env-file claudepulse.env \
+  ghcr.io/substance0/claudepulse:latest
 ```
 
-Passing the token through `--env-file` keeps it out of your shell history. The token is valid for one year.
-
-**💡 Timezone (Optional):** Set the `TZ` environment variable to your local timezone for better log readability. Replace `America/New_York` with your timezone (e.g., `Europe/London`, `Asia/Tokyo`). Default is `UTC`. [Find your timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
-
-**Stopping ClaudePulse:**
-
-```bash
-# Stop the container
-docker stop claudepulse
-
-# Remove the container (keeps volumes)
-docker rm claudepulse
-```
+Set `TZ` to your [time zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) so log timestamps match your clock (default `UTC`). Podman works the same way: replace `docker` with `podman`.
 
 </details>
 
 <details>
-<summary><strong>🐳 Docker Compose (Alternative)</strong></summary>
+<summary><strong>🐳 Docker Compose</strong></summary>
 
-**Download docker-compose.yml:**
+Download the compose file next to `claudepulse.env`, then start it:
 
 ```bash
-# Download the compose file
 curl -O https://raw.githubusercontent.com/substance0/claudepulse/main/docker-compose.yml
-
-# Or clone the entire repository
-git clone https://github.com/substance0/claudepulse.git
-cd claudepulse
+TZ=America/New_York docker compose up -d
 ```
 
-**Start with Docker Compose:**
-
-```bash
-docker compose up -d
-```
-
-**💡 Timezone (Optional):** Edit `docker-compose.yml` to set the `TZ` environment variable to your local timezone for better log readability. Default is `UTC`.
-
-**Authentication:** export `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`, see above) in the shell that runs `docker compose up`, or reference an env file from the service with `env_file:`.
-
-**Stopping ClaudePulse:**
-
-```bash
-# Stop the Docker Compose stack
-docker compose down
-
-# Or stop individual container
-docker stop claudepulse
-```
+Settings go in `environment:`; secrets, including the optional Discord webhooks, go in `claudepulse.env`. Values under `environment:` override the env file, so never list a secret there.
 
 </details>
 
 <details>
-<summary><strong>💻 Local Development</strong></summary>
+<summary><strong>💻 From Source</strong></summary>
 
-**Clone and Setup:**
+Requires Node.js 22 or later and the Claude CLI on your `PATH`. There are no runtime dependencies, so no `npm install` is needed to run it:
 
 ```bash
 git clone https://github.com/substance0/claudepulse.git
 cd claudepulse
-npm install
-```
-
-**Run with Node.js:**
-
-```bash
+set -a && . ./claudepulse.env && set +a
 npm start
 ```
 
-**Or build and run locally with Docker:**
+Or build and run the image locally: `docker compose -f docker-compose.dev.yml up -d`.
 
-```bash
-# Build from Dockerfile
-docker compose -f docker-compose.dev.yml up -d
-
-# View logs
-docker logs claudepulse-dev
-```
-
-**Requirements:** Node.js 18+ or Docker/Podman
-
----
-
-**Authentication:** requires the Claude CLI on your `PATH`. Export `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` before `npm start`.
+For development setup, tests and the release process, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 </details>
 
-## Release Channels
+## Operating
 
-| Tag                           | Published                  | Use                         |
-| ----------------------------- | -------------------------- | --------------------------- |
-| `latest`, `X.Y.Z`, `X.Y`, `X` | when a release is cut      | production                  |
-| `edge`, `X.Y.Z-dev.N`         | every commit on `main`     | early access to merged work |
-| `snapshot-<branch>`           | on demand, from any branch | testing a branch            |
-| `sha-<commit>`                | every edge and release     | pinning an exact build      |
-
-Right after a release, `edge` still carries the previous line's version
-(e.g. `1.0.1-dev.N` next to a new `2.0.0`), because it is built from the
-commit the release was cut from. Its content matches the release, and the
-next commit on `main` gives it the new line's version.
-
-Build a snapshot of a branch (the branch must contain these workflows, so merge `main` into it first):
+**Check that it works.** A healthy run logs a successful pulse, then the time of the next one:
 
 ```bash
-gh workflow run docker-snapshot.yml --ref <branch>
-gh workflow run docker-snapshot.yml --ref <branch> -f platforms=linux/amd64,linux/arm64
+docker logs -f claudepulse
+# [INFO] [PULSE] Pulse successful (window_resets=…, cost=…)
+# [INFO] [STRATEGY] ✓ Strategy selected: window_reset → scheduling next pulse at …
 ```
 
-Snapshots are built from branches only, and the branch name must be 119
-characters or fewer so that `snapshot-<branch>` fits Docker's tag limit.
+`docker ps` also shows a health status. It checks that Node.js and the Claude CLI run, not that pulses succeed; failed pulses show up in the logs and in Discord alerts.
 
-Rebuild the image of an existing release, if its build failed:
+**Upgrade** to the latest release:
 
 ```bash
-gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
+docker pull ghcr.io/substance0/claudepulse:latest
+docker rm -f claudepulse   # then run the `docker run` command above again
+
+docker compose pull && docker compose up -d   # with Docker Compose
 ```
 
-Every image carries build provenance. Verify one with:
+**Renew the token** before it expires, one year after `claude setup-token`. An expired token makes every pulse fail with an authentication error, and it is not retried. Run `claude setup-token` again, replace the line in `claudepulse.env`, then recreate the container as for an upgrade.
+
+**Stop** ClaudePulse with `docker rm -f claudepulse`, or `docker compose down`.
+
+## Configuration
+
+Every setting has a default. Pass settings with `-e` or under `environment:`, and secrets through `claudepulse.env`. [ENVIRONMENT.md](ENVIRONMENT.md) documents each one in detail.
+
+### Settings
+
+| Variable                     | Default       | Description                                                            |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------- |
+| `TZ`                         | `UTC`         | Time zone for logs and `SCHEDULED_START_HOUR`                          |
+| `SCHEDULED_START_HOUR`       | unset         | Hour (0-23) of the first pulse; later pulses follow the window         |
+| `LOG_LEVEL`                  | `INFO`        | Logging verbosity (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)          |
+| `DRY_RUN`                    | `false`       | Print the schedule and exit without sending a pulse                    |
+| `PROMPT_TEXT`                | `pulse check` | Message each pulse sends to Claude                                     |
+| `MAX_RETRIES`                | `3`           | Maximum retry attempts on failure                                      |
+| `RETRY_BACKOFF_MULTIPLIER`   | `2`           | Exponential backoff multiplier                                         |
+| `MAX_BACKOFF_MINUTES`        | `30`          | Maximum retry delay in minutes                                         |
+| `IMMEDIATE_PULSE_AFTER_AUTH` | `true`        | Pulse at startup to learn the current window                           |
+| `KEEP_PULSE_ON_FAILURE`      | `false`       | Keep the container running when the scheduler fails to start, for debugging |
+
+### Secrets (`claudepulse.env`)
+
+| Variable                     | Required | Description                                          |
+| ---------------------------- | -------- | ---------------------------------------------------- |
+| `CLAUDE_CODE_OAUTH_TOKEN`    | yes      | Token from `claude setup-token`                      |
+| `DISCORD_WEBHOOK_URL`        | no       | Discord webhook for error alerts                     |
+| `DISCORD_WINDOW_WEBHOOK_URL` | no       | Discord webhook announcing each window's reset time  |
+
+### Discord Notifications (Optional)
+
+ClaudePulse can post to two Discord webhooks:
+
+- **Error alerts** (`DISCORD_WEBHOOK_URL`): failed pulses and other errors, spaced out during an outage.
+- **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time, or "Usage limit reached" with the time it lifts. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
+
+To set one up:
+
+1. **Create the webhook**: Discord Server → Settings → Integrations → Webhooks → New Webhook, then copy its URL.
+2. **Add it to `claudepulse.env`**. A webhook URL is a secret: anyone holding it can post to the channel.
+   ```bash
+   echo "DISCORD_WINDOW_WEBHOOK_URL=https://discord.com/api/webhooks/…" >> claudepulse.env
+   ```
+3. **Recreate the container** so it reads the new value, as for an upgrade.
+
+See [ENVIRONMENT.md](ENVIRONMENT.md#discord_webhook_url) to send a test alert.
+
+## Image Tags
+
+Images are published to `ghcr.io/substance0/claudepulse` for `linux/amd64` and `linux/arm64`.
+
+| Tag                           | Published              | Use                         |
+| ----------------------------- | ---------------------- | --------------------------- |
+| `latest`, `X.Y.Z`, `X.Y`, `X` | when a release is cut  | production                  |
+| `edge`, `X.Y.Z-dev.N`         | every commit on `main` | early access to merged work |
+| `sha-<commit>`                | every edge and release | pinning an exact build      |
+
+Every image carries signed build provenance. Verify one with:
 
 ```bash
 gh attestation verify oci://ghcr.io/substance0/claudepulse:<tag> -R substance0/claudepulse
 ```
 
-## Features
-
-| Feature                            | Description                                                                                                                                                                                         |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Window-Aware Scheduling**        | Every pulse reports when the current 5-hour window resets; the next pulse lands just after it, so one pulse per window is enough                                                                    |
-| **Docker & Compose Ready**         | One-command deployment; the token is the only state it needs                                                                                                                                        |
-| **Claude Code Authentication**     | Runs Claude Code for each pulse, which authenticates itself from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse stores no credentials                                                                       |
-| **Low-Cost Pulses**                | Each pulse runs the cheapest model with thinking disabled, in an isolated directory and configuration, and keeps the prompt cache warm                                                              |
-| **Intelligent Scheduling**         | Follows the reported window, waits out usage limits, respects a configured start hour, and falls back to hourly pulses until a window is known ([see strategies details](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
-| **Immediate First Pulse**          | If the current 5-hour window cannot be detected, sends a pulse at startup to open a new window                                                                                                      |
-| **Intelligent Retry with Backoff** | Exponential backoff (configurable multiplier & max delay) for transient failures; authentication failures are not retried                                                                           |
-| **Spaced Failure Alerts**          | Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so a long outage stays visible without flooding the channel                                                                 |
-| **No Runtime Dependencies**        | No npm runtime dependencies; relies on the Claude CLI included in the image                                                                                                                         |
-
-## Configuration
-
-ClaudePulse uses environment variables for configuration. All settings have sensible defaults.
-
-For comprehensive configuration documentation, see [ENVIRONMENT.md](ENVIRONMENT.md).
-
-### Essential Settings
-
-| Variable      | Default  | Description                                  |
-| ------------- | -------- | -------------------------------------------- |
-| `PROMPT_TEXT` | `"ping"` | Pulse message sent to Claude                 |
-| `MAX_RETRIES` | `3`      | Maximum retry attempts on failure            |
-| `LOG_LEVEL`   | `INFO`   | Logging verbosity (ERROR, WARN, INFO, DEBUG) |
-| `DRY_RUN`     | `false`  | Simulate pulses without sending to Claude    |
-
-### Advanced Settings
-
-| Variable                   | Default      | Description                          |
-| -------------------------- | ------------ | ------------------------------------ |
-| `RETRY_BACKOFF_MULTIPLIER` | `2`          | Exponential backoff multiplier       |
-| `MAX_BACKOFF_MINUTES`      | `30`         | Maximum retry delay in minutes       |
-| `NODE_ENV`                 | `production` | Environment mode                     |
-| `DISCORD_WEBHOOK_URL`      | `unset`      | Discord webhook URL for error alerts |
-| `DISCORD_WINDOW_WEBHOOK_URL` | `unset`    | Discord webhook announcing each window's reset time |
-
-### Discord Notifications (Optional)
-
-Get instant error alerts in Discord by setting up a webhook:
-
-1. **Create webhook**: Discord Server → Settings → Integrations → Webhooks → New Webhook
-2. **Copy webhook URL**
-3. **Add to environment**:
-   ```bash
-   docker run -d --name claudepulse \
-     --env-file claudepulse.env \
-     ghcr.io/substance0/claudepulse:latest
-   ```
-
-Error notifications include error details, timestamp, and context. See [ENVIRONMENT.md](ENVIRONMENT.md#discord_webhook_url) for testing and advanced configuration.
+Branch snapshots and release rebuilds are covered in [CONTRIBUTING.md](CONTRIBUTING.md#image-builds).
 
 ## Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/substance0/claudepulse/issues)
-- Documentation: [Full documentation](https://github.com/substance0/claudepulse/wiki)
-- Workflow Diagrams: [Visual process flows](docs/workflow-diagrams.md)
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes and version history.
+- [Report bugs or request features](https://github.com/substance0/claudepulse/issues)
+- [Environment variables reference](ENVIRONMENT.md)
+- [Workflow diagrams](docs/workflow-diagrams.md)
+- [Changelog](CHANGELOG.md)
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on how to contribute to ClaudePulse.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, checks and release process.
 
 ## License
 

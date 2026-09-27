@@ -42,6 +42,7 @@ const DEFAULT_CONFIG = {
   IMMEDIATE_PULSE_AFTER_AUTH: true,
   DISCORD_WEBHOOK_URL: undefined,
   DISCORD_WINDOW_WEBHOOK_URL: undefined,
+  ACCOUNT_LABEL: undefined,
 };
 
 /**
@@ -62,6 +63,7 @@ function parseEnvironmentVariables() {
     IMMEDIATE_PULSE_AFTER_AUTH: process.env.IMMEDIATE_PULSE_AFTER_AUTH,
     DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
     DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
+    ACCOUNT_LABEL: process.env.ACCOUNT_LABEL || undefined,
   };
 }
 
@@ -137,6 +139,15 @@ export function validateConfig(config) {
     ) {
       errors.push("SCHEDULED_START_HOUR must be an integer between 0 and 23");
     }
+  }
+
+  if (
+    config.ACCOUNT_LABEL !== undefined &&
+    !/^[A-Za-z0-9 ._-]{1,32}$/.test(config.ACCOUNT_LABEL)
+  ) {
+    errors.push(
+      "ACCOUNT_LABEL must be 1-32 letters, digits, spaces, dots, underscores or hyphens",
+    );
   }
 
   if (errors.length > 0) {

@@ -106,3 +106,47 @@ test("has no settings that nothing reads", async () => {
   assert.equal("NODE_ENV" in config, false);
   assert.equal("DEBUG" in config, false);
 });
+
+test("reads the account label from the environment", async () => {
+  // Arrange
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.ACCOUNT_LABEL = "work";
+
+  try {
+    // Act
+    const config = loadConfig();
+
+    // Assert
+    assert.equal(config.ACCOUNT_LABEL, "work");
+  } finally {
+    delete process.env.ACCOUNT_LABEL;
+  }
+});
+
+test("an empty account label counts as unset", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.ACCOUNT_LABEL = "";
+
+  try {
+    assert.equal(loadConfig().ACCOUNT_LABEL, undefined);
+  } finally {
+    delete process.env.ACCOUNT_LABEL;
+  }
+});
+
+test("rejects an account label with characters Discord would format", async () => {
+  const { loadConfig, validateConfig } = await import("../src/core/config/index.js");
+
+  for (const label of ["a*b", "a`b", "line\nbreak", "x".repeat(33)]) {
+    const config = { ...loadConfig(), ACCOUNT_LABEL: label };
+    assert.throws(() => validateConfig(config), /ACCOUNT_LABEL/, JSON.stringify(label));
+  }
+});
+
+test("accepts a plain account label", async () => {
+  const { loadConfig, validateConfig } = await import("../src/core/config/index.js");
+
+  const config = { ...loadConfig(), ACCOUNT_LABEL: "Team A_1.b-2" };
+
+  assert.equal(validateConfig(config), true);
+});

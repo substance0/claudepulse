@@ -7,6 +7,10 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | Variable                     | Type    | Default         | Description                                     |
 | ---------------------------- | ------- | --------------- | ----------------------------------------------- |
 | `SCHEDULED_START_HOUR`       | Number  | `unset`         | Hour for first pulse only (0-23)                |
+| `WORK_START`                 | String  | `unset`         | Working day start (`HH:MM`); turns work hours on |
+| `WORK_END`                   | String  | `unset`         | No window starts at or after (`HH:MM`)          |
+| `HOURS_LEFT_AT_START`        | Number  | `5`             | Hours left at `WORK_START` (1-5)                |
+| `WORK_DAYS`                  | String  | every day       | Working days, e.g. `Mon-Fri`                    |
 | `PROMPT_TEXT`                | String  | `"pulse check"` | Message sent to Claude                          |
 | `MAX_RETRIES`                | Number  | `3`             | Maximum retry attempts (1-10)                   |
 | `RETRY_BACKOFF_MULTIPLIER`   | Number  | `2`             | Exponential backoff multiplier (1.0-5.0)        |
@@ -45,6 +49,39 @@ SCHEDULED_START_HOUR=4
 ```
 
 **Note:** Container timezone is set via `TZ` environment variable (e.g., `TZ=America/New_York`).
+
+---
+
+### Work Hours
+
+**Purpose:** Pulse only during your working day, and open its first window
+early so part of it is left when you start, followed soon by a fresh one.
+
+| Setting               | Format                              | Default                    |
+| --------------------- | ----------------------------------- | -------------------------- |
+| `WORK_START`          | `HH:MM`                             | unset                      |
+| `WORK_END`            | `HH:MM`                             | required with `WORK_START` |
+| `HOURS_LEFT_AT_START` | 1-5                                 | `5`                        |
+| `WORK_DAYS`           | `Mon-Fri`, `Mon-Thu,Sat`, `Fri-Mon` | every day                  |
+
+A window ends at its first prompt's hour, rounded down, plus 5 hours. With
+`WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, the day's first pulse fires at
+06:00:10: its window resets at 11:00, leaving 2 hours at 09:00, and the next
+window opens at 11:00. Pulses then follow each reset until `WORK_END`; none
+is sent at night or on other days, and none at startup outside these hours.
+
+With a start that is not on the hour, the window has at least
+`HOURS_LEFT_AT_START` hours left: `09:30` with 2 opens at 07:00:10, leaving
+2.5 hours.
+
+`WORK_START` and `SCHEDULED_START_HOUR` cannot both be set.
+
+```bash
+WORK_START=09:00
+WORK_END=19:00
+HOURS_LEFT_AT_START=2
+WORK_DAYS=Mon-Fri
+```
 
 ---
 

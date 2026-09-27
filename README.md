@@ -40,6 +40,7 @@ Claude's 5-hour windows don't start on their own when the previous one resets. A
 1. **A pulse** runs Claude Code once (`claude -p`) on the cheapest model, with thinking disabled and an isolated configuration, so it costs as little as possible.
 2. **Claude Code reports when the current window resets.** ClaudePulse schedules the next pulse just after that time, so one pulse per window is enough.
 3. **At startup**, ClaudePulse pulses right away to learn the current window, or waits for `SCHEDULED_START_HOUR` if you set one. Until a window is known, it pulses hourly.
+4. **Work hours** (optional): with `WORK_START`, `WORK_END` and `HOURS_LEFT_AT_START`, the first pulse of each working day lands so the window has that many hours left when you start, and a fresh window follows soon after. No pulse is sent at night, on days off, or at startup outside these hours.
 
 See the [workflow diagrams](docs/workflow-diagrams.md) for the full scheduling logic.
 
@@ -153,7 +154,11 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 | ---------------------------- | ------------- | ---------------------------------------------------------------------- |
 | `TZ`                         | `UTC`         | Time zone for logs and `SCHEDULED_START_HOUR`                          |
 | `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
-| `SCHEDULED_START_HOUR`       | unset         | Hour (0-23) of the first pulse; later pulses follow the window         |
+| `WORK_START`                 | unset         | When your working day starts (`HH:MM`); turns work hours on            |
+| `WORK_END`                   | unset         | No window starts at or after this time (`HH:MM`); required with `WORK_START` |
+| `HOURS_LEFT_AT_START`        | `5`           | Hours left in the window at `WORK_START` (1-5)                         |
+| `WORK_DAYS`                  | every day     | Working days, e.g. `Mon-Fri` or `Mon-Thu,Sat`                          |
+| `SCHEDULED_START_HOUR`       | unset         | Hour (0-23) of a single first pulse; later pulses follow the window. Not with `WORK_START` |
 | `LOG_LEVEL`                  | `INFO`        | Logging verbosity (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)          |
 | `DRY_RUN`                    | `false`       | Print the schedule and exit without sending a pulse                    |
 | `PROMPT_TEXT`                | `pulse check` | Message each pulse sends to Claude                                     |

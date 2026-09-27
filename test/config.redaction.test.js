@@ -150,3 +150,17 @@ test("accepts a plain account label", async () => {
 
   assert.equal(validateConfig(config), true);
 });
+
+test("trims spaces around the account label", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+
+  try {
+    process.env.ACCOUNT_LABEL = " work ";
+    assert.equal(loadConfig().ACCOUNT_LABEL, "work");
+
+    process.env.ACCOUNT_LABEL = "   ";
+    assert.equal(loadConfig().ACCOUNT_LABEL, undefined);
+  } finally {
+    delete process.env.ACCOUNT_LABEL;
+  }
+});

@@ -63,7 +63,8 @@ function parseEnvironmentVariables() {
     IMMEDIATE_PULSE_AFTER_AUTH: process.env.IMMEDIATE_PULSE_AFTER_AUTH,
     DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
     DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
-    ACCOUNT_LABEL: process.env.ACCOUNT_LABEL || undefined,
+    // Trimmed: a stray space in an env file would otherwise show in every label
+    ACCOUNT_LABEL: process.env.ACCOUNT_LABEL?.trim() || undefined,
   };
 }
 

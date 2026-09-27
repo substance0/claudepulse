@@ -3,6 +3,8 @@
  * Consolidates all environment variables and defaults in one place
  */
 
+import { workHoursErrors } from "../../features/scheduling/workHours.js";
+
 /** Config keys whose values must never reach logs, alerts, or error payloads. */
 const SECRET_CONFIG_KEYS = [
   "DISCORD_WEBHOOK_URL",
@@ -43,6 +45,10 @@ const DEFAULT_CONFIG = {
   DISCORD_WEBHOOK_URL: undefined,
   DISCORD_WINDOW_WEBHOOK_URL: undefined,
   ACCOUNT_LABEL: undefined,
+  WORK_START: undefined,
+  WORK_END: undefined,
+  WORK_DAYS: undefined,
+  HOURS_LEFT_AT_START: undefined,
 };
 
 /**
@@ -65,6 +71,10 @@ function parseEnvironmentVariables() {
     DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
     // Trimmed: a stray space in an env file would otherwise show in every label
     ACCOUNT_LABEL: process.env.ACCOUNT_LABEL?.trim() || undefined,
+    WORK_START: process.env.WORK_START || undefined,
+    WORK_END: process.env.WORK_END || undefined,
+    WORK_DAYS: process.env.WORK_DAYS || undefined,
+    HOURS_LEFT_AT_START: process.env.HOURS_LEFT_AT_START || undefined,
   };
 }
 
@@ -150,6 +160,8 @@ export function validateConfig(config) {
       "ACCOUNT_LABEL must be 1-32 letters, digits, spaces, dots, underscores or hyphens",
     );
   }
+
+  errors.push(...workHoursErrors(config));
 
   if (errors.length > 0) {
     throw new Error(`Configuration validation failed:\n${errors.join("\n")}`);

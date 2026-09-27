@@ -164,3 +164,32 @@ test("trims spaces around the account label", async () => {
     delete process.env.ACCOUNT_LABEL;
   }
 });
+
+test("reads the work-hours settings", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+  Object.assign(process.env, {
+    WORK_START: "09:00",
+    WORK_END: "19:00",
+    WORK_DAYS: "Mon-Fri",
+    HOURS_LEFT_AT_START: "2",
+  });
+
+  try {
+    const config = loadConfig();
+    assert.equal(config.WORK_START, "09:00");
+    assert.equal(config.WORK_END, "19:00");
+    assert.equal(config.WORK_DAYS, "Mon-Fri");
+    assert.equal(config.HOURS_LEFT_AT_START, "2");
+  } finally {
+    for (const key of ["WORK_START", "WORK_END", "WORK_DAYS", "HOURS_LEFT_AT_START"]) {
+      delete process.env[key];
+    }
+  }
+});
+
+test("rejects work hours that end before they start", async () => {
+  const { loadConfig, validateConfig } = await import("../src/core/config/index.js");
+  const config = { ...loadConfig(), WORK_START: "19:00", WORK_END: "09:00" };
+
+  assert.throws(() => validateConfig(config), /WORK_END must be later than WORK_START/);
+});

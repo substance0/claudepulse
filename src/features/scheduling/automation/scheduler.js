@@ -92,6 +92,7 @@ export class PulseScheduler {
    * @param {Object} options.logger - Logger instance
    * @param {Object} options.config - Configuration object
    * @param {{notify: Function}} [options.notifier] - Announces each pulse's window
+   * @param {{nextAllowed: Function, isActive: Function}} [options.workHours] - Limits pulses to working hours
    */
   constructor(options = {}) {
     // Validate required dependencies
@@ -108,6 +109,7 @@ export class PulseScheduler {
     // Injected dependencies
     this.executor = options.executor;
     this.notifier = options.notifier;
+    this.workHours = options.workHours ?? null;
     this.logger = options.logger.child({
       component: "scheduler",
       intervalHours: options.config.intervalHours || 5,
@@ -442,13 +444,22 @@ export class PulseScheduler {
     };
 
     // Use strategy manager to compute next run time
-    const { time: planned, strategy } =
+    let { time: planned, strategy } =
       await this.schedulingManager.computeNextRunTime(context);
 
     // Strategies return future times; roll forward defensively if one did not
     let finalTime = planned;
     while (finalTime <= now) {
       finalTime = new Date(finalTime.getTime() + this.fixedIntervalMs);
+    }
+
+    // Outside working hours, the pulse waits for the next working day.
+    if (this.workHours) {
+      const allowed = this.workHours.nextAllowed(finalTime);
+      if (allowed.getTime() !== finalTime.getTime()) {
+        finalTime = allowed;
+        strategy = "work_hours";
+      }
     }
     this.lastScheduledTime = finalTime;
 
@@ -487,8 +498,11 @@ export class PulseScheduler {
 
     // Without a real pulse no window is known, so the first pulse would
     // follow the configured start hour or the next hour.
-    const optimalNextRun =
+    const firstPulse =
       this._nextFromInitialPulseHourPlusTen() ?? this._nextHourPlusTen();
+    const optimalNextRun = this.workHours
+      ? this.workHours.nextAllowed(firstPulse)
+      : firstPulse;
     const intervalMs = optimalNextRun.getTime() - Date.now();
 
     this.logger.info("dry-run", "Scheduling Analysis", {
@@ -522,9 +536,17 @@ export class PulseScheduler {
     });
 
     // The first pulse reports the current window, which every later pulse is
-    // scheduled from.
+    // scheduled from. Outside working hours it would open a window nobody
+    // uses, so the working day's first pulse is left to the schedule.
     if (this.config.immediatePulseAfterAuth) {
-      await this._sendInitialPulse();
+      if (this.workHours && !this.workHours.isActive(new Date())) {
+        this.logger.info(
+          "startup",
+          "Outside work hours - no startup pulse, waiting for the working day",
+        );
+      } else {
+        await this._sendInitialPulse();
+      }
     }
 
     await this._scheduleNext();

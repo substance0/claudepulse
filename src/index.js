@@ -9,6 +9,7 @@ import {
 } from "./core/config/index.js";
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
 import { createWindowNotifier } from "./core/services/windowNotification.js";
+import { createWorkHoursFromConfig } from "./features/scheduling/workHours.js";
 import { displayBanner } from "./core/utils/banner.js";
 import fs from "fs/promises";
 import path from "path";
@@ -95,6 +96,7 @@ async function runScheduler(config, logger) {
     logger,
     config,
     notifier,
+    workHours: createWorkHoursFromConfig(config),
   });
 
   // === End Composition Root ===

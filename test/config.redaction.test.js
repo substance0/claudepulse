@@ -94,3 +94,15 @@ test("reads the window notification webhook from the environment", async () => {
     delete process.env.DISCORD_WINDOW_WEBHOOK_URL;
   }
 });
+
+test("has no settings that nothing reads", async () => {
+  // Arrange
+  const { loadConfig } = await import("../src/core/config/index.js");
+
+  // Act
+  const config = loadConfig();
+
+  // Assert
+  assert.equal("NODE_ENV" in config, false);
+  assert.equal("DEBUG" in config, false);
+});

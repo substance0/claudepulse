@@ -34,8 +34,6 @@ const DEFAULT_CONFIG = {
   MAX_RETRIES: 3,
   RETRY_BACKOFF_MULTIPLIER: 2,
   MAX_BACKOFF_MINUTES: 30,
-  DEBUG: false,
-  NODE_ENV: "production",
   LOG_LEVEL: "INFO",
   DRY_RUN: false,
   KEEP_PULSE_ON_FAILURE: false,
@@ -56,8 +54,6 @@ function parseEnvironmentVariables() {
     MAX_RETRIES: process.env.MAX_RETRIES,
     RETRY_BACKOFF_MULTIPLIER: process.env.RETRY_BACKOFF_MULTIPLIER,
     MAX_BACKOFF_MINUTES: process.env.MAX_BACKOFF_MINUTES,
-    DEBUG: process.env.DEBUG,
-    NODE_ENV: process.env.NODE_ENV,
     LOG_LEVEL: process.env.LOG_LEVEL,
     DRY_RUN: process.env.DRY_RUN,
     KEEP_PULSE_ON_FAILURE: process.env.KEEP_PULSE_ON_FAILURE,
@@ -88,7 +84,6 @@ export function loadConfig() {
   config.MAX_RETRIES = parseInt(config.MAX_RETRIES);
   config.RETRY_BACKOFF_MULTIPLIER = parseFloat(config.RETRY_BACKOFF_MULTIPLIER);
   config.MAX_BACKOFF_MINUTES = parseInt(config.MAX_BACKOFF_MINUTES);
-  config.DEBUG = config.DEBUG === "true";
   config.DRY_RUN = config.DRY_RUN === "true";
   config.KEEP_PULSE_ON_FAILURE = config.KEEP_PULSE_ON_FAILURE === "true";
   config.IMMEDIATE_PULSE_AFTER_AUTH =

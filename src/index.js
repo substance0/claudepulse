@@ -10,6 +10,10 @@ import {
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
 import { createWindowNotifier } from "./core/services/windowNotification.js";
 import {
+  createTokenExpiryMonitor,
+  parseExpiryDate,
+} from "./core/services/tokenExpiry.js";
+import {
   createWorkHoursFromConfig,
   workHoursWarnings,
 } from "./features/scheduling/workHours.js";
@@ -17,6 +21,9 @@ import { displayBanner } from "./core/utils/banner.js";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+
+/** How often the token expiry date is checked against the warning thresholds. */
+const TOKEN_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 function setupShutdownHandlers(heartbeatInterval, scheduler, label) {
   const shutdown = (signal) => {
@@ -144,6 +151,25 @@ async function runScheduler(config, logger) {
       "ClaudePulse automation running... Press Ctrl+C to stop",
     );
   } catch {}
+
+  if (config.TOKEN_EXPIRES_AT) {
+    const monitor = createTokenExpiryMonitor({
+      expiresAt: parseExpiryDate(config.TOKEN_EXPIRES_AT),
+      webhookUrl: config.DISCORD_WEBHOOK_URL,
+      label: config.ACCOUNT_LABEL,
+      logger,
+    });
+    const checkExpiry = () =>
+      monitor.check().catch((error) =>
+        logger.warn("token", "Token expiry check failed", {
+          error: error.message,
+        }),
+      );
+    await checkExpiry();
+    // Hourly is plenty for day-sized thresholds; unref lets shutdown proceed.
+    setInterval(checkExpiry, TOKEN_CHECK_INTERVAL_MS).unref();
+  }
+
   return { scheduler, heartbeatInterval: null };
 }
 

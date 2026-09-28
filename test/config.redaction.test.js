@@ -210,3 +210,21 @@ test("work hours are off unless WORK_HOURS_ENABLED is true", async () => {
     delete process.env.WORK_HOURS_ENABLED;
   }
 });
+
+test("reads the token expiry date", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.TOKEN_EXPIRES_AT = "2027-09-25";
+
+  try {
+    assert.equal(loadConfig().TOKEN_EXPIRES_AT, "2027-09-25");
+  } finally {
+    delete process.env.TOKEN_EXPIRES_AT;
+  }
+});
+
+test("rejects a token expiry that is not a real date", async () => {
+  const { loadConfig, validateConfig } = await import("../src/core/config/index.js");
+  const config = { ...loadConfig(), TOKEN_EXPIRES_AT: "2027-02-30" };
+
+  assert.throws(() => validateConfig(config), /TOKEN_EXPIRES_AT must be a date as YYYY-MM-DD/);
+});

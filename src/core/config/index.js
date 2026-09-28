@@ -4,6 +4,7 @@
  */
 
 import { workHoursErrors } from "../../features/scheduling/workHours.js";
+import { parseExpiryDate } from "../services/tokenExpiry.js";
 
 /** Config keys whose values must never reach logs, alerts, or error payloads. */
 const SECRET_CONFIG_KEYS = [
@@ -45,6 +46,7 @@ const DEFAULT_CONFIG = {
   DISCORD_WEBHOOK_URL: undefined,
   DISCORD_WINDOW_WEBHOOK_URL: undefined,
   ACCOUNT_LABEL: undefined,
+  TOKEN_EXPIRES_AT: undefined,
   WORK_HOURS_ENABLED: false,
   WORK_START: undefined,
   WORK_END: undefined,
@@ -72,6 +74,7 @@ function parseEnvironmentVariables() {
     DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
     // Trimmed: a stray space in an env file would otherwise show in every label
     ACCOUNT_LABEL: process.env.ACCOUNT_LABEL?.trim() || undefined,
+    TOKEN_EXPIRES_AT: process.env.TOKEN_EXPIRES_AT || undefined,
     WORK_HOURS_ENABLED: process.env.WORK_HOURS_ENABLED,
     WORK_START: process.env.WORK_START || undefined,
     WORK_END: process.env.WORK_END || undefined,
@@ -162,6 +165,13 @@ export function validateConfig(config) {
     errors.push(
       "ACCOUNT_LABEL must be 1-32 letters, digits, spaces, dots, underscores or hyphens",
     );
+  }
+
+  if (
+    config.TOKEN_EXPIRES_AT !== undefined &&
+    !parseExpiryDate(config.TOKEN_EXPIRES_AT)
+  ) {
+    errors.push("TOKEN_EXPIRES_AT must be a date as YYYY-MM-DD, e.g. 2027-09-25");
   }
 
   errors.push(...workHoursErrors(config));

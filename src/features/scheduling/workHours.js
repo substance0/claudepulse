@@ -122,14 +122,21 @@ function ceilToHour(date) {
  * @returns {{nextAllowed: (t: Date) => Date, isActive: (t: Date) => boolean}}
  */
 export function createWorkHours({ start, end, hoursLeft, days }) {
-  /** First pulse of a working day, so hoursLeft hours remain at start. */
+  /**
+   * First pulse of a working day, so hoursLeft hours remain at start. It
+   * never fires after the start of work's hour: rounding the target reset up
+   * would otherwise push it past a start such as 09:30 with 5 hours left.
+   */
   function dayStartPulse(workDay) {
     const targetReset = ceilToHour(
       new Date(atClock(workDay, start).getTime() + hoursLeft * HOUR_MS),
     );
     const pulse = new Date(targetReset);
     pulse.setHours(pulse.getHours() - WINDOW_HOURS, 0, PULSE_SECOND, 0);
-    return pulse;
+
+    const latest = atClock(workDay, { hour: start.hour, minute: 0 });
+    latest.setSeconds(PULSE_SECOND);
+    return pulse < latest ? pulse : latest;
   }
 
   /**

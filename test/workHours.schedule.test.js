@@ -100,3 +100,12 @@ test("never returns a time earlier than asked", () => {
 test("is off without WORK_START", () => {
   assert.equal(createWorkHoursFromConfig({}), null);
 });
+
+test("never opens the working day after work starts", () => {
+  // 09:30 + 5 h rounds up to 15:00, which would put the pulse at 10:00:10;
+  // it is capped at the start of work's hour instead (4.5 h left at 09:30)
+  const halfPast = createWorkHoursFromConfig({ WORK_START: "09:30", WORK_END: "19:00" });
+
+  assert.deepEqual(halfPast.nextAllowed(local(9, 30, 3)), local(9, 30, 9, 0, 10));
+  assert.equal(halfPast.isActive(local(9, 30, 9, 45)), true);
+});

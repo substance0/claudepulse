@@ -1,5 +1,6 @@
 import { DateUtility } from "../../../core/utils/DateUtility.js";
 import { SchedulingStrategyManager } from "../strategy/scheduling-strategies.js";
+import { isWeeklyRejection } from "../../../core/services/windowNotification.js";
 
 /**
  * Claude Session Automation Scheduler
@@ -234,6 +235,7 @@ export class PulseScheduler {
       if (isLimitReached(result)) {
         this.logger.info("pulse", "Usage limit reached - waiting for reset", {
           resetsAt: result.rateLimit.resetsAt?.toISOString(),
+          limit: isWeeklyRejection(result.rateLimit) ? "weekly" : "5-hour",
           timerDurationMs: duration?.ms,
         });
       } else {

@@ -39,7 +39,7 @@ function discordDateTime(date) {
  * @param {Object} rateLimit
  * @returns {boolean}
  */
-function isWeeklyRejection(rateLimit) {
+export function isWeeklyRejection(rateLimit) {
   if (rateLimit.limitType) {
     return rateLimit.limitType.startsWith("seven_day");
   }

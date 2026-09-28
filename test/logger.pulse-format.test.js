@@ -49,3 +49,9 @@ test("shows weekly usage after a successful pulse", () => {
 test("leaves weekly usage out when unknown", () => {
   assert.doesNotMatch(formatPulse({ weeklyUsage: undefined }), /weekly=/);
 });
+
+test("names which limit refused the pulse", () => {
+  const line = formatPulse({ resetsAt: "2026-09-28T07:00:00.000Z", limit: "weekly" });
+
+  assert.match(line, /limit=weekly/);
+});

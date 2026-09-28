@@ -33,14 +33,15 @@ function discordDateTime(date) {
 }
 
 /**
- * Whether a rejected pulse is blocked by the weekly limit. The limit type is
- * undocumented, so a reset matching the weekly window's also counts.
+ * Whether a rejected pulse is blocked by the weekly limit. A reported limit
+ * type decides; every seven_day* type is a weekly limit. The type is
+ * undocumented, so without one a reset matching the weekly window's counts.
  * @param {Object} rateLimit
  * @returns {boolean}
  */
 function isWeeklyRejection(rateLimit) {
-  if (rateLimit.limitType === "seven_day") {
-    return true;
+  if (rateLimit.limitType) {
+    return rateLimit.limitType.startsWith("seven_day");
   }
   const weeklyReset = rateLimit.weekly?.resetsAt;
   return (

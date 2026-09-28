@@ -204,3 +204,33 @@ test("leaves weekly usage out when it is unknown", () => {
 
   assert.doesNotMatch(payload.description, /Weekly usage/);
 });
+
+test("an explicit 5-hour limit is not called weekly, even when resets coincide", () => {
+  const payload = buildWindowNotification({
+    success: false,
+    rateLimit: {
+      status: "rejected",
+      resetsAt: WEEK_RESET,
+      fiveHourResetsAt: WEEK_RESET,
+      limitType: "five_hour",
+      weekly: { utilization: 0.4, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.equal(payload.title, "Usage limit reached");
+});
+
+test("every seven-day limit type counts as the weekly limit", () => {
+  const payload = buildWindowNotification({
+    success: false,
+    rateLimit: {
+      status: "rejected",
+      resetsAt: WEEK_RESET,
+      fiveHourResetsAt: null,
+      limitType: "seven_day_overage_included",
+      weekly: null,
+    },
+  });
+
+  assert.equal(payload.title, "Weekly limit reached");
+});

@@ -1,3 +1,24 @@
+# [2.2.0](https://github.com/substance0/claudepulse/compare/v2.1.0...v2.2.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* never open the working day after work starts ([9031a94](https://github.com/substance0/claudepulse/commit/9031a9484a9519deedbc7c00b95e05d0d2b1f33a))
+* place the day-start pulse exactly 5 real hours before the target reset ([79285f6](https://github.com/substance0/claudepulse/commit/79285f6a103db8516d66ce6d5698a602b5cb22b6))
+* reject day ranges with more than one dash in WORK_DAYS ([4d4e4c5](https://github.com/substance0/claudepulse/commit/4d4e4c5c87e40b49589bfaa3d8901b9a02da147a))
+* stop retrying a failed pulse once work hours are over ([ebad948](https://github.com/substance0/claudepulse/commit/ebad948cb6b3c12d139ca8c5ddc8fade3cf1af01))
+
+
+### Features
+
+* compute the day-start pulse and the next allowed pulse time ([e4accac](https://github.com/substance0/claudepulse/commit/e4accac4ef4cabba49f92a3f8d7d85d0b5366c75))
+* load and validate the work-hours settings ([1aa6758](https://github.com/substance0/claudepulse/commit/1aa6758097144f9eaa8f52b3661a6979d967a879))
+* log when work hours move a pulse and when the working day starts ([d8f36ce](https://github.com/substance0/claudepulse/commit/d8f36ce1fdcc9a973ab3d663f3d16ef3b3e5f340))
+* parse and validate work-hours settings ([cdbffef](https://github.com/substance0/claudepulse/commit/cdbffef2cb3e1a43ca21bfc81d1afbd92573f906))
+* pulse only during work hours and open the working day early ([b8e01b6](https://github.com/substance0/claudepulse/commit/b8e01b6a3d6581dada61704adfac41186cb2c914))
+* switch work hours on only with WORK_HOURS_ENABLED=true ([e8c6aa7](https://github.com/substance0/claudepulse/commit/e8c6aa7646db5cb004ce670b76e0737876584931))
+* warn about work hours that are ignored or leave too little time off ([088705f](https://github.com/substance0/claudepulse/commit/088705f39b8c1c60bbbee9e9e365ef7cbdad78b4))
+
 # [2.1.0](https://github.com/substance0/claudepulse/compare/v2.0.0...v2.1.0) (2026-09-27)
 
 

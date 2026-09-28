@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { PulseScheduler } from "../src/features/scheduling/automation/scheduler.js";
+import { DateUtility } from "../src/core/utils/DateUtility.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -118,4 +119,48 @@ test("sends the startup pulse inside work hours", async () => {
   }
 
   assert.equal(record.attempts, 1);
+});
+
+test("names the working day's first pulse when skipping the startup pulse", async () => {
+  const firstPulse = new Date(Date.now() + 4 * HOUR_MS);
+  const { scheduler, record } = buildScheduler({
+    workHours: { nextAllowed: () => firstPulse, isActive: () => false },
+    pulseResult: allowedPulse(new Date(Date.now() + 3 * HOUR_MS)),
+  });
+
+  try {
+    await scheduler.start();
+  } finally {
+    await scheduler.shutdown();
+  }
+
+  assert.ok(
+    record.infos.some(
+      (m) => /outside work hours/i.test(m) && m.includes(DateUtility.formatLocalIso(firstPulse)),
+    ),
+    record.infos.join("\n"),
+  );
+});
+
+test("says when work hours move a planned pulse", async () => {
+  const nextMorning = new Date(Date.now() + 20 * HOUR_MS);
+  const { scheduler, record } = buildScheduler({
+    workHours: { nextAllowed: () => nextMorning, isActive: () => true },
+    pulseResult: allowedPulse(new Date(Date.now() + 3 * HOUR_MS)),
+  });
+  scheduler.running = true;
+
+  try {
+    await scheduler._executePulseCycle();
+    await scheduler._scheduleNext();
+  } finally {
+    await scheduler.shutdown();
+  }
+
+  assert.ok(
+    record.infos.some(
+      (m) => /work hours: next pulse moved/i.test(m) && m.includes(DateUtility.formatLocalIso(nextMorning)),
+    ),
+    record.infos.join("\n"),
+  );
 });

@@ -457,6 +457,10 @@ export class PulseScheduler {
     if (this.workHours) {
       const allowed = this.workHours.nextAllowed(finalTime);
       if (allowed.getTime() !== finalTime.getTime()) {
+        this.logger.info(
+          "schedule",
+          `Work hours: next pulse moved from ${DateUtility.formatLocalIso(finalTime)} to ${DateUtility.formatLocalIso(allowed)}`,
+        );
         finalTime = allowed;
         strategy = "work_hours";
       }
@@ -539,10 +543,12 @@ export class PulseScheduler {
     // scheduled from. Outside working hours it would open a window nobody
     // uses, so the working day's first pulse is left to the schedule.
     if (this.config.immediatePulseAfterAuth) {
-      if (this.workHours && !this.workHours.isActive(new Date())) {
+      const now = new Date();
+      if (this.workHours && !this.workHours.isActive(now)) {
+        const firstPulse = this.workHours.nextAllowed(now);
         this.logger.info(
           "startup",
-          "Outside work hours - no startup pulse, waiting for the working day",
+          `Outside work hours - no startup pulse; the working day's first pulse is at ${DateUtility.formatLocalIso(firstPulse)}`,
         );
       } else {
         await this._sendInitialPulse();

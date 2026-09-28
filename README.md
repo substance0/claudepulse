@@ -140,7 +140,7 @@ docker rm -f claudepulse   # then run the `docker run` command above again
 docker compose pull && docker compose up -d   # with Docker Compose
 ```
 
-**Renew the token** before it expires, one year after `claude setup-token`. An expired token makes every pulse fail with an authentication error, and it is not retried. Run `claude setup-token` again, replace the line in `claudepulse.env`, then recreate the container as for an upgrade.
+**Renew the token** before it expires, one year after `claude setup-token`. An expired token makes every pulse fail with an authentication error, and it is not retried. Run `claude setup-token` again, replace the line in `claudepulse.env`, then recreate the container as for an upgrade. Set `TOKEN_EXPIRES_AT` to the date one year after `claude setup-token` to be warned on Discord 14, 7 and 1 day before.
 
 **Stop** ClaudePulse with `docker rm -f claudepulse`, or `docker compose down`.
 
@@ -154,6 +154,7 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 | ---------------------------- | ------------- | ---------------------------------------------------------------------- |
 | `TZ`                         | `UTC`         | Time zone for logs, work hours and `SCHEDULED_START_HOUR`              |
 | `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
+| `TOKEN_EXPIRES_AT`           | unset         | Token expiry (`YYYY-MM-DD`); Discord warnings 14, 7 and 1 day before   |
 | `WORK_HOURS_ENABLED`         | `false`       | Turns work hours on (see [Work Hours](ENVIRONMENT.md#work-hours))       |
 | `WORK_START`                 | unset         | When your working day starts (`HH:MM`); required when enabled          |
 | `WORK_END`                   | unset         | No window starts at or after this time (`HH:MM`); required when enabled |

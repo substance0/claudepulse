@@ -24,6 +24,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `DISCORD_WEBHOOK_URL`        | String  | `unset`         | Discord webhook URL for error notifications     |
 | `DISCORD_WINDOW_WEBHOOK_URL` | String  | `unset`         | Discord webhook announcing window reset times   |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | String  | required        | Token from `claude setup-token`                 |
+| `TOKEN_EXPIRES_AT`           | Date    | `unset`         | Token expiry (`YYYY-MM-DD`) for warnings        |
 
 ## Core Configuration
 
@@ -337,6 +338,24 @@ services:
 
 The token is not validated at startup. An expired or rejected one surfaces as
 a failed pulse, which is reported without retrying (see `MAX_RETRIES`).
+
+---
+
+### `TOKEN_EXPIRES_AT`
+
+**Purpose:** Be warned before the token from `claude setup-token` expires.
+
+**Type:** Date, `YYYY-MM-DD` (local midnight)
+**Default:** Unset (no warnings)
+
+ClaudePulse cannot read the token's expiry, so record it here: one year
+after you ran `claude setup-token`. Warnings go to `DISCORD_WEBHOOK_URL` and
+the log when 14, 7 and 1 day(s) are left, and once it has expired. A restart
+re-sends the current warning once.
+
+```bash
+TOKEN_EXPIRES_AT=2027-09-25
+```
 
 ---
 

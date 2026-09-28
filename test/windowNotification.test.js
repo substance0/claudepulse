@@ -251,3 +251,24 @@ test("never presents the weekly reset as the current window's reset", () => {
 
   assert.equal(payload, null);
 });
+
+test("labels the weekly limit notification with the account", async () => {
+  const sent = [];
+  const notifier = createWindowNotifier("https://discord.test/hook", {
+    label: "work",
+    send: async (payload) => sent.push(payload),
+  });
+
+  await notifier.notify({
+    success: false,
+    rateLimit: {
+      status: "rejected",
+      resetsAt: WEEK_RESET,
+      fiveHourResetsAt: null,
+      limitType: "seven_day",
+      weekly: { utilization: 1, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.equal(sent[0].title, "work · Weekly limit reached");
+});

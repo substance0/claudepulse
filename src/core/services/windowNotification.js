@@ -26,7 +26,12 @@ function isValidDate(value) {
   return value instanceof Date && !Number.isNaN(value.getTime());
 }
 
-/** Discord markup for a date and time days away: full date, then countdown. */
+/**
+ * Format a date days away as Discord timestamp markup: the full date and
+ * time in each reader's own time zone, then a live relative countdown.
+ * @param {Date} date
+ * @returns {string}
+ */
 function discordDateTime(date) {
   const epoch = Math.floor(date.getTime() / 1000);
   return `<t:${epoch}:F> (<t:${epoch}:R>)`;

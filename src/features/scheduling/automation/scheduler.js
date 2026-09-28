@@ -373,6 +373,15 @@ export class PulseScheduler {
         return;
       }
 
+      // A retry after working hours would open a window nobody uses; the
+      // next pulse waits for the working day instead.
+      if (attempt > 0 && this.workHours && !this.workHours.isActive(new Date())) {
+        this._failCycle("Work hours ended - retries resume on the working day", {
+          attempts: attempt,
+        });
+        return;
+      }
+
       const result = this._processPulseResult(await this._sendPulse());
 
       if (result.success) {

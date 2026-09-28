@@ -164,3 +164,28 @@ test("says when work hours move a planned pulse", async () => {
     record.infos.join("\n"),
   );
 });
+
+test("stops retrying once work hours are over", async () => {
+  // Arrange: a failing pulse, and work hours that end during the backoff
+  const { scheduler, record } = buildScheduler({
+    workHours: { nextAllowed: (t) => new Date(t), isActive: () => false },
+    pulseResult: {
+      success: false,
+      authFailure: false,
+      error: "API Error: 503 upstream temporarily unavailable",
+      rateLimit: null,
+    },
+  });
+  scheduler.running = true;
+
+  // Act
+  try {
+    await scheduler._executePulseCycle();
+  } finally {
+    await scheduler.shutdown();
+  }
+
+  // Assert: one attempt, and the failed cycle still counts toward alerts
+  assert.equal(record.attempts, 1);
+  assert.equal(scheduler.consecutiveFailures, 1);
+});

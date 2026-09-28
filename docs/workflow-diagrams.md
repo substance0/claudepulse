@@ -131,6 +131,7 @@ Strategies are evaluated in priority order. The first applicable strategy determ
 - **`scheduled_start`** is explicit configuration, so it wins for the first scheduled pulse only
 - **`discovery`** is a fallback: a single successful pulse is enough to leave it
 - All strategies include a 10-second buffer so the pulse lands in the new window rather than racing its boundary
+- With work hours set (`WORK_START`), the chosen time then moves to the next moment inside working hours, usually the next working day's first pulse; the log then names the strategy `work_hours`
 
 ```mermaid
 graph TD

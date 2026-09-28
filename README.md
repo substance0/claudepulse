@@ -152,7 +152,7 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 
 | Variable                     | Default       | Description                                                            |
 | ---------------------------- | ------------- | ---------------------------------------------------------------------- |
-| `TZ`                         | `UTC`         | Time zone for logs and `SCHEDULED_START_HOUR`                          |
+| `TZ`                         | `UTC`         | Time zone for logs, work hours and `SCHEDULED_START_HOUR`              |
 | `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
 | `WORK_START`                 | unset         | When your working day starts (`HH:MM`); turns work hours on            |
 | `WORK_END`                   | unset         | No window starts at or after this time (`HH:MM`); required with `WORK_START` |

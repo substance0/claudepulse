@@ -2,11 +2,10 @@
  * Work hours: when pulses are allowed, and when the first window of a working
  * day opens.
  *
- * A window lasts about 5 hours from the pulse that opens it. To have at least
+ * A window resets 5 hours after the minute of the pulse that opens it. To have
  * HOURS_LEFT_AT_START hours left when work starts, the day's first pulse
- * fires 5 hours before WORK_START + HOURS_LEFT_AT_START, rounded up to the
- * hour, and never after the start of work's hour. All times are local to the
- * container's TZ.
+ * fires 5 hours before WORK_START + HOURS_LEFT_AT_START, plus a 10-second
+ * buffer. Clock times are local to the container's TZ.
  */
 
 const DAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -115,15 +114,6 @@ function atClock(day, clock) {
   return d;
 }
 
-/** Round up to the next full hour, unless already on one. */
-function ceilToHour(date) {
-  const d = new Date(date);
-  if (d.getMinutes() || d.getSeconds() || d.getMilliseconds()) {
-    d.setHours(d.getHours() + 1, 0, 0, 0);
-  }
-  return d;
-}
-
 /**
  * Build the work-hours rules.
  * @param {{start: {hour: number, minute: number}, end: {hour: number, minute: number}, hoursLeft: number, days: Set<number>}} settings
@@ -131,20 +121,14 @@ function ceilToHour(date) {
  */
 export function createWorkHours({ start, end, hoursLeft, days }) {
   /**
-   * First pulse of a working day, so hoursLeft hours remain at start. It
-   * never fires after the start of work's hour: rounding the target reset up
-   * would otherwise push it past a start such as 09:30 with 5 hours left.
+   * First pulse of a working day, so hoursLeft hours remain at start. Windows
+   * last 5 real hours, so the offset is real time, not wall-clock hours, which
+   * keeps the hours left exact on daylight-saving days.
    */
   function dayStartPulse(workDay) {
-    const targetReset = ceilToHour(
-      new Date(atClock(workDay, start).getTime() + hoursLeft * HOUR_MS),
-    );
-    const pulse = new Date(targetReset);
-    pulse.setHours(pulse.getHours() - WINDOW_HOURS, 0, PULSE_SECOND, 0);
-
-    const latest = atClock(workDay, { hour: start.hour, minute: 0 });
-    latest.setSeconds(PULSE_SECOND);
-    return pulse < latest ? pulse : latest;
+    const targetReset =
+      atClock(workDay, start).getTime() + hoursLeft * HOUR_MS;
+    return new Date(targetReset - WINDOW_HOURS * HOUR_MS + PULSE_SECOND * 1000);
   }
 
   /**

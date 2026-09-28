@@ -56,15 +56,15 @@ test("the time before the day-start pulse is not active", () => {
   assert.equal(weekdays.isActive(local(9, 30, 5, 59)), false);
 });
 
-test("rounds the target reset up to the hour", () => {
+test("leaves exactly the hours asked for a start that is not on the hour", () => {
   const halfPast = enabled({
     WORK_START: "09:30",
     WORK_END: "19:00",
     HOURS_LEFT_AT_START: "2",
   });
 
-  // 09:30 + 2 h = 11:30 → reset 12:00 → pulse 07:00:10 (2.5 h left at 09:30)
-  assert.deepEqual(halfPast.nextAllowed(local(9, 30, 3)), local(9, 30, 7, 0, 10));
+  // Windows run 5 h from the pulse's minute: 06:30:10 resets at 11:30
+  assert.deepEqual(halfPast.nextAllowed(local(9, 30, 3)), local(9, 30, 6, 30, 10));
 });
 
 test("defaults to opening the window when work starts", () => {
@@ -74,12 +74,30 @@ test("defaults to opening the window when work starts", () => {
 });
 
 test("keeps the local day-start time across a daylight-saving change", () => {
-  // Sun 25 Oct is the switch; Monday's pulse is still 06:00:10 local
-  const next = weekdays.nextAllowed(local(10, 25, 21));
+  // From Friday in summer time to Monday in winter time: the clocks go back
+  // on Sun 25 Oct, and Monday's pulse is still 06:00:10 local, 05:00:10 UTC
+  const next = weekdays.nextAllowed(local(10, 23, 21));
 
-  assert.equal(next.getDate(), 26);
-  assert.equal(next.getHours(), 6);
-  assert.equal(next.getMinutes(), 0);
+  assert.equal(next.toISOString(), "2026-10-26T05:00:10.000Z");
+});
+
+// On a switch day, 5 wall-clock hours are not 5 real hours; windows last 5
+// real hours, so the pulse must land 5 real hours before the target reset.
+const earlyStart = () =>
+  enabled({ WORK_START: "04:00", WORK_END: "10:00", HOURS_LEFT_AT_START: "2" });
+
+test("leaves the hours asked on the day the clocks go back", () => {
+  // Target reset Sun 25 Oct 06:00 CET = 05:00Z → pulse 00:00:10Z (02:00:10 CEST)
+  const next = earlyStart().nextAllowed(local(10, 24, 12));
+
+  assert.equal(next.toISOString(), "2026-10-25T00:00:10.000Z");
+});
+
+test("leaves the hours asked on the day the clocks go forward", () => {
+  // Target reset Sun 29 Mar 06:00 CEST = 04:00Z → pulse 23:00:10Z the day before
+  const next = earlyStart().nextAllowed(new Date(2026, 2, 28, 12));
+
+  assert.equal(next.toISOString(), "2026-03-28T23:00:10.000Z");
 });
 
 test("a day-start pulse can fall on the previous evening", () => {
@@ -105,12 +123,10 @@ test("is off without WORK_START", () => {
   assert.equal(createWorkHoursFromConfig({}), null);
 });
 
-test("never opens the working day after work starts", () => {
-  // 09:30 + 5 h rounds up to 15:00, which would put the pulse at 10:00:10;
-  // it is capped at the start of work's hour instead (4.5 h left at 09:30)
+test("with 5 hours left, opens the window as work starts", () => {
   const halfPast = enabled({ WORK_START: "09:30", WORK_END: "19:00" });
 
-  assert.deepEqual(halfPast.nextAllowed(local(9, 30, 3)), local(9, 30, 9, 0, 10));
+  assert.deepEqual(halfPast.nextAllowed(local(9, 30, 3)), local(9, 30, 9, 30, 10));
   assert.equal(halfPast.isActive(local(9, 30, 9, 45)), true);
 });
 

@@ -65,3 +65,11 @@ test("explains each invalid work-hours setting", () => {
     assert.match(workHoursErrors(config).join("\n"), expected, JSON.stringify(config));
   }
 });
+
+test("rejects a day range with more than one dash", () => {
+  assert.equal(parseWorkDays("Mon-Tue-Wed"), null);
+});
+
+test("accepts spaces around a range dash", () => {
+  assert.deepEqual([...parseWorkDays("Mon - Fri")].sort(), [1, 2, 3, 4, 5]);
+});

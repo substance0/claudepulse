@@ -31,7 +31,11 @@ export function parseWorkDays(text) {
   const days = new Set();
 
   for (const part of String(text).split(",")) {
-    const [from, to = from] = part.trim().toLowerCase().split("-");
+    const ends = part.toLowerCase().split("-").map((end) => end.trim());
+    if (ends.length > 2) {
+      return null;
+    }
+    const [from, to = from] = ends;
     const first = DAY_NAMES.indexOf(from);
     const last = DAY_NAMES.indexOf(to);
     if (first < 0 || last < 0) {

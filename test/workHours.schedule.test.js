@@ -8,12 +8,16 @@ const { createWorkHoursFromConfig } = await import(
   "../src/features/scheduling/workHours.js"
 );
 
+/** Work hours switched on with the given settings. */
+const enabled = (settings) =>
+  createWorkHoursFromConfig({ WORK_HOURS_ENABLED: true, ...settings });
+
 /** A local time; month is 1-12. */
 const local = (month, day, hour, minute = 0, second = 0) =>
   new Date(2026, month - 1, day, hour, minute, second);
 
 // Mon 28 Sep 2026 … Sun 4 Oct 2026, then Mon 5 Oct.
-const weekdays = createWorkHoursFromConfig({
+const weekdays = enabled({
   WORK_START: "09:00",
   WORK_END: "19:00",
   HOURS_LEFT_AT_START: "2",
@@ -53,7 +57,7 @@ test("the time before the day-start pulse is not active", () => {
 });
 
 test("rounds the target reset up to the hour", () => {
-  const halfPast = createWorkHoursFromConfig({
+  const halfPast = enabled({
     WORK_START: "09:30",
     WORK_END: "19:00",
     HOURS_LEFT_AT_START: "2",
@@ -64,7 +68,7 @@ test("rounds the target reset up to the hour", () => {
 });
 
 test("defaults to opening the window when work starts", () => {
-  const atStart = createWorkHoursFromConfig({ WORK_START: "09:00", WORK_END: "19:00" });
+  const atStart = enabled({ WORK_START: "09:00", WORK_END: "19:00" });
 
   assert.deepEqual(atStart.nextAllowed(local(9, 30, 3)), local(9, 30, 9, 0, 10));
 });
@@ -79,7 +83,7 @@ test("keeps the local day-start time across a daylight-saving change", () => {
 });
 
 test("a day-start pulse can fall on the previous evening", () => {
-  const early = createWorkHoursFromConfig({
+  const early = enabled({
     WORK_START: "01:00",
     WORK_END: "10:00",
     HOURS_LEFT_AT_START: "1",
@@ -104,8 +108,12 @@ test("is off without WORK_START", () => {
 test("never opens the working day after work starts", () => {
   // 09:30 + 5 h rounds up to 15:00, which would put the pulse at 10:00:10;
   // it is capped at the start of work's hour instead (4.5 h left at 09:30)
-  const halfPast = createWorkHoursFromConfig({ WORK_START: "09:30", WORK_END: "19:00" });
+  const halfPast = enabled({ WORK_START: "09:30", WORK_END: "19:00" });
 
   assert.deepEqual(halfPast.nextAllowed(local(9, 30, 3)), local(9, 30, 9, 0, 10));
   assert.equal(halfPast.isActive(local(9, 30, 9, 45)), true);
+});
+
+test("is off unless WORK_HOURS_ENABLED is true", () => {
+  assert.equal(createWorkHoursFromConfig({ WORK_START: "09:00", WORK_END: "19:00" }), null);
 });

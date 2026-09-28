@@ -35,6 +35,7 @@ test("rejects an unknown day name", () => {
 
 test("accepts a complete work-hours configuration", () => {
   const errors = workHoursErrors({
+    WORK_HOURS_ENABLED: true,
     WORK_START: "09:00",
     WORK_END: "19:00",
     HOURS_LEFT_AT_START: "2",
@@ -48,17 +49,23 @@ test("accepts no work-hours configuration at all", () => {
   assert.deepEqual(workHoursErrors({}), []);
 });
 
+test("ignores work-hours settings while the feature is off", () => {
+  // Settings can stay in place while work hours are switched off
+  assert.deepEqual(workHoursErrors({ WORK_START: "9h", SCHEDULED_START_HOUR: 6 }), []);
+});
+
 test("explains each invalid work-hours setting", () => {
+  const on = { WORK_HOURS_ENABLED: true };
   const cases = [
-    [{ WORK_START: "9h", WORK_END: "19:00" }, /WORK_START must be HH:MM/],
-    [{ WORK_START: "09:00" }, /WORK_END is required/],
-    [{ WORK_START: "09:00", WORK_END: "7pm" }, /WORK_END must be HH:MM/],
-    [{ WORK_START: "19:00", WORK_END: "09:00" }, /WORK_END must be later than WORK_START/],
-    [{ WORK_START: "09:00", WORK_END: "19:00", HOURS_LEFT_AT_START: "6" }, /HOURS_LEFT_AT_START must be a whole number from 1 to 5/],
-    [{ WORK_START: "09:00", WORK_END: "19:00", HOURS_LEFT_AT_START: "2.5" }, /HOURS_LEFT_AT_START/],
-    [{ WORK_START: "09:00", WORK_END: "19:00", WORK_DAYS: "Weekdays" }, /WORK_DAYS must list days/],
-    [{ WORK_END: "19:00" }, /require WORK_START/],
-    [{ WORK_START: "09:00", WORK_END: "19:00", SCHEDULED_START_HOUR: 6 }, /not both/],
+    [{ ...on, WORK_START: "9h", WORK_END: "19:00" }, /WORK_START must be HH:MM/],
+    [{ ...on, WORK_START: "09:00" }, /WORK_END is required/],
+    [{ ...on, WORK_START: "09:00", WORK_END: "7pm" }, /WORK_END must be HH:MM/],
+    [{ ...on, WORK_START: "19:00", WORK_END: "09:00" }, /WORK_END must be later than WORK_START/],
+    [{ ...on, WORK_START: "09:00", WORK_END: "19:00", HOURS_LEFT_AT_START: "6" }, /HOURS_LEFT_AT_START must be a whole number from 1 to 5/],
+    [{ ...on, WORK_START: "09:00", WORK_END: "19:00", HOURS_LEFT_AT_START: "2.5" }, /HOURS_LEFT_AT_START/],
+    [{ ...on, WORK_START: "09:00", WORK_END: "19:00", WORK_DAYS: "Weekdays" }, /WORK_DAYS must list days/],
+    [{ ...on, WORK_END: "19:00" }, /WORK_HOURS_ENABLED=true requires WORK_START/],
+    [{ ...on, WORK_START: "09:00", WORK_END: "19:00", SCHEDULED_START_HOUR: 6 }, /not both/],
   ];
 
   for (const [config, expected] of cases) {

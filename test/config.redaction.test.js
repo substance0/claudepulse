@@ -189,7 +189,24 @@ test("reads the work-hours settings", async () => {
 
 test("rejects work hours that end before they start", async () => {
   const { loadConfig, validateConfig } = await import("../src/core/config/index.js");
-  const config = { ...loadConfig(), WORK_START: "19:00", WORK_END: "09:00" };
+  const config = {
+    ...loadConfig(),
+    WORK_HOURS_ENABLED: true,
+    WORK_START: "19:00",
+    WORK_END: "09:00",
+  };
 
   assert.throws(() => validateConfig(config), /WORK_END must be later than WORK_START/);
+});
+
+test("work hours are off unless WORK_HOURS_ENABLED is true", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+
+  try {
+    assert.equal(loadConfig().WORK_HOURS_ENABLED, false);
+    process.env.WORK_HOURS_ENABLED = "true";
+    assert.equal(loadConfig().WORK_HOURS_ENABLED, true);
+  } finally {
+    delete process.env.WORK_HOURS_ENABLED;
+  }
 });

@@ -51,8 +51,9 @@ export function parseWorkDays(text) {
 }
 
 /**
- * Validation errors for the work-hours settings, empty when they are valid
- * or unset.
+ * Validation errors for the work-hours settings. Work hours are opt-in: while
+ * WORK_HOURS_ENABLED is not true, the other settings are ignored, so they can
+ * stay in place while the feature is switched off.
  * @param {Object} config - Loaded configuration
  * @returns {string[]}
  */
@@ -60,10 +61,12 @@ export function workHoursErrors(config) {
   const errors = [];
   const { WORK_START, WORK_END, WORK_DAYS, HOURS_LEFT_AT_START } = config;
 
+  if (config.WORK_HOURS_ENABLED !== true) {
+    return errors;
+  }
+
   if (WORK_START === undefined) {
-    if ([WORK_END, WORK_DAYS, HOURS_LEFT_AT_START].some((v) => v !== undefined)) {
-      errors.push("WORK_END, WORK_DAYS and HOURS_LEFT_AT_START require WORK_START");
-    }
+    errors.push("WORK_HOURS_ENABLED=true requires WORK_START and WORK_END");
     return errors;
   }
 
@@ -174,10 +177,10 @@ export function createWorkHours({ start, end, hoursLeft, days }) {
 /**
  * Build the work-hours rules from validated configuration.
  * @param {Object} config - Configuration that passed workHoursErrors()
- * @returns {ReturnType<typeof createWorkHours>|null} Null when WORK_START is unset
+ * @returns {ReturnType<typeof createWorkHours>|null} Null unless WORK_HOURS_ENABLED is true
  */
 export function createWorkHoursFromConfig(config) {
-  if (config.WORK_START === undefined) {
+  if (config.WORK_HOURS_ENABLED !== true) {
     return null;
   }
   return createWorkHours({

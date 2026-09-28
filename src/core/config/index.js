@@ -45,6 +45,7 @@ const DEFAULT_CONFIG = {
   DISCORD_WEBHOOK_URL: undefined,
   DISCORD_WINDOW_WEBHOOK_URL: undefined,
   ACCOUNT_LABEL: undefined,
+  WORK_HOURS_ENABLED: false,
   WORK_START: undefined,
   WORK_END: undefined,
   WORK_DAYS: undefined,
@@ -71,6 +72,7 @@ function parseEnvironmentVariables() {
     DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
     // Trimmed: a stray space in an env file would otherwise show in every label
     ACCOUNT_LABEL: process.env.ACCOUNT_LABEL?.trim() || undefined,
+    WORK_HOURS_ENABLED: process.env.WORK_HOURS_ENABLED,
     WORK_START: process.env.WORK_START || undefined,
     WORK_END: process.env.WORK_END || undefined,
     WORK_DAYS: process.env.WORK_DAYS || undefined,
@@ -99,6 +101,7 @@ export function loadConfig() {
   config.MAX_BACKOFF_MINUTES = parseInt(config.MAX_BACKOFF_MINUTES);
   config.DRY_RUN = config.DRY_RUN === "true";
   config.KEEP_PULSE_ON_FAILURE = config.KEEP_PULSE_ON_FAILURE === "true";
+  config.WORK_HOURS_ENABLED = config.WORK_HOURS_ENABLED === "true";
   config.IMMEDIATE_PULSE_AFTER_AUTH =
     config.IMMEDIATE_PULSE_AFTER_AUTH !== "false";
 

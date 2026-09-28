@@ -403,8 +403,10 @@ reset time is visible from a phone.
 
 - After each pulse that reports a window, posts "Window open" with the reset
   time. Discord shows it in each reader's own time zone, with a countdown.
-- When a pulse is refused because the limit is reached, posts "Usage limit
-  reached" with the time the limit lifts.
+- When a pulse is refused, posts "Usage limit reached" with the time the
+  limit lifts, or "Weekly limit reached" with the date and time the weekly
+  limit lifts. Pulsing resumes on its own at that time.
+- "Window open" also shows weekly usage and when the weekly window resets.
 - Uses a webhook of its own. Create it in a dedicated channel, then mute or
   unmute that channel in Discord to turn announcements off and on without
   touching error alerts.

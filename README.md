@@ -49,7 +49,7 @@ See the [workflow diagrams](docs/workflow-diagrams.md) for the full scheduling l
 | Feature                     | Description                                                                                                                         |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **Window-Aware Scheduling** | Follows the reported window reset, waits out usage limits, and respects a configured start hour ([strategies](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
-| **Window Notifications**    | Optional Discord message each time a window opens or the usage limit is reached, with the reset time in your local time zone        |
+| **Window Notifications**    | Optional Discord message each time a window opens (with weekly usage) or a 5-hour or weekly limit is reached, with reset times in your local time zone |
 | **Spaced Failure Alerts**   | Optional Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so an outage stays visible without flooding the channel |
 | **Retry with Backoff**      | Exponential backoff (configurable multiplier and maximum delay) for transient failures; authentication failures are not retried     |
 | **No Stored Credentials**   | Claude Code authenticates each pulse from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse keeps no credentials and no state                  |
@@ -125,7 +125,7 @@ For development setup, tests and the release process, see [CONTRIBUTING.md](CONT
 
 ```bash
 docker logs -f claudepulse
-# [INFO] [PULSE] Pulse successful (window_resets=…, cost=…)
+# [INFO] [PULSE] Pulse successful (window_resets=…, weekly=20%, cost=…)
 # [INFO] [STRATEGY] ✓ Strategy selected: window_reset → scheduling next pulse at …
 ```
 
@@ -182,7 +182,7 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 ClaudePulse can post to two Discord webhooks:
 
 - **Error alerts** (`DISCORD_WEBHOOK_URL`): failed pulses and other errors, spaced out during an outage.
-- **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time, or "Usage limit reached" with the time it lifts. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
+- **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, or "Weekly limit reached" with the date it lifts. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
 
 To set one up:
 

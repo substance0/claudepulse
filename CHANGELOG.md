@@ -1,3 +1,19 @@
+# [2.3.0](https://github.com/substance0/claudepulse/compare/v2.2.0...v2.3.0) (2026-09-28)
+
+
+### Bug Fixes
+
+* let a reported limit type decide whether the weekly limit blocks pulsing ([18575de](https://github.com/substance0/claudepulse/commit/18575ded15cc7e674a366c91bf6bcddd22351a96))
+* never announce the weekly reset as the current window's reset ([f18084a](https://github.com/substance0/claudepulse/commit/f18084ab92f1caf23b0ee91efcb2b4f8dfb3e415))
+
+
+### Features
+
+* announce the weekly limit and show weekly usage ([aac074b](https://github.com/substance0/claudepulse/commit/aac074be89bb8a0feba6132590cf7fec9af3fe22))
+* log weekly usage with each successful pulse ([b110657](https://github.com/substance0/claudepulse/commit/b11065713150846f09af111537ef85d1182bc3fb))
+* name the weekly or 5-hour limit in the refusal log line ([a55f2a7](https://github.com/substance0/claudepulse/commit/a55f2a75f8d6c53c9241414f78468ed20e18e9e1))
+* read the weekly window from each pulse ([bdc1f22](https://github.com/substance0/claudepulse/commit/bdc1f22e6edf8c09342091a0c5b29b16270454a1))
+
 # [2.2.0](https://github.com/substance0/claudepulse/compare/v2.1.0...v2.2.0) (2026-09-28)
 
 

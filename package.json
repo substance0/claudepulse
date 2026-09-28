@@ -1,6 +1,6 @@
 {
   "name": "claudepulse",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value",
   "type": "module",
   "main": "src/index.js",

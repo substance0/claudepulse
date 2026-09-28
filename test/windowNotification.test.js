@@ -234,3 +234,20 @@ test("every seven-day limit type counts as the weekly limit", () => {
 
   assert.equal(payload.title, "Weekly limit reached");
 });
+
+test("never presents the weekly reset as the current window's reset", () => {
+  // A weekly warning without a 5-hour reset: the current window's reset is
+  // unknown, so there is nothing true to announce
+  const payload = buildWindowNotification({
+    success: true,
+    rateLimit: {
+      status: "allowed_warning",
+      resetsAt: WEEK_RESET,
+      fiveHourResetsAt: null,
+      limitType: "seven_day",
+      weekly: { utilization: 0.9, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.equal(payload, null);
+});

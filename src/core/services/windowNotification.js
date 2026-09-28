@@ -95,7 +95,13 @@ export function buildWindowNotification(pulseResult) {
     };
   }
 
-  const windowReset = rateLimit.fiveHourResetsAt ?? rateLimit.resetsAt;
+  // resetsAt names the current window only when the event is about the
+  // 5-hour window, or does not say which window it is about.
+  const resetsAtIsCurrentWindow =
+    !rateLimit.limitType || rateLimit.limitType === "five_hour";
+  const windowReset =
+    rateLimit.fiveHourResetsAt ??
+    (resetsAtIsCurrentWindow ? rateLimit.resetsAt : null);
   if (!pulseResult.success || !isValidDate(windowReset)) {
     return null;
   }

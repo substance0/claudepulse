@@ -64,15 +64,18 @@ early so part of it is left when you start, followed soon by a fresh one.
 | `HOURS_LEFT_AT_START` | 1-5                                 | `5`                        |
 | `WORK_DAYS`           | `Mon-Fri`, `Mon-Thu,Sat`, `Fri-Mon` | every day                  |
 
-A window ends at its first prompt's hour, rounded down, plus 5 hours. With
-`WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, the day's first pulse fires at
-06:00:10: its window resets at 11:00, leaving 2 hours at 09:00, and the next
-window opens at 11:00. Pulses then follow each reset until `WORK_END`; none
-is sent at night or on other days, and none at startup outside these hours.
+A window lasts about 5 hours from the pulse that opens it. The day's first
+pulse fires 5 hours before `WORK_START + HOURS_LEFT_AT_START`, rounded up to
+the hour. With `WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, it fires at
+06:00:10: its window resets around 11:00, leaving 2 hours at 09:00, and the
+next window opens right after. Pulses then follow each reported reset until
+`WORK_END`; none is sent at night or on other days, and none at startup
+outside these hours.
 
 With a start that is not on the hour, the window has at least
 `HOURS_LEFT_AT_START` hours left: `09:30` with 2 opens at 07:00:10, leaving
-2.5 hours.
+about 2.5 hours. The first pulse never fires after the start of work's hour,
+so `09:30` with the default 5 opens at 09:00:10, leaving about 4.5 hours.
 
 `WORK_START` and `SCHEDULED_START_HOUR` cannot both be set.
 

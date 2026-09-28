@@ -16,9 +16,10 @@ Six features, shipped in this order, one pull request each:
 ## Background: how a window works
 
 A usage window starts with the first prompt after the previous window resets,
-and ends at that prompt's hour, rounded down, plus 5 hours. A pulse at
-06:00:10 opens a window that resets at 11:00. The next pulse lands just after
-that reset (10 s buffer), so windows chain: 06–11, 11–16, 16–21.
+and lasts about 5 hours; reported resets are not on the hour (a real one was
+13:50:00Z). A pulse at 06:00:10 opens a window that resets around 11:00. The
+next pulse lands just after the reported reset (10 s buffer), so windows
+chain: 06–11, 11–16, 16–21.
 
 Each pulse's `rate_limit_event` carries, as observed on a real pulse:
 

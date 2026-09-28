@@ -20,7 +20,7 @@
 
 ## At a Glance
 
-Claude's 5-hour windows don't start on their own when the previous one resets. A new window only starts with your first prompt after the reset, and it ends 5 hours after that prompt's hour, rounded down. If you come back to your desk late, the window starts late too.
+Claude's 5-hour windows don't start on their own when the previous one resets. A new window only starts with your first prompt after the reset, and it ends about 5 hours later. If you come back to your desk late, the window starts late too.
 
 > [!WARNING]
 > The "5-hour limit" can trigger before 5 actual hours due to token limits or other Claude-specific thresholds. See more details [on Claude's website](https://support.claude.com/en/articles/11647753-how-do-usage-and-length-limits-work).

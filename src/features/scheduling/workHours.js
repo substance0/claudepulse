@@ -2,10 +2,11 @@
  * Work hours: when pulses are allowed, and when the first window of a working
  * day opens.
  *
- * A window ends at its first prompt's hour, rounded down, plus 5 hours. To
- * have HOURS_LEFT_AT_START hours left when work starts, the day's first pulse
+ * A window lasts about 5 hours from the pulse that opens it. To have at least
+ * HOURS_LEFT_AT_START hours left when work starts, the day's first pulse
  * fires 5 hours before WORK_START + HOURS_LEFT_AT_START, rounded up to the
- * hour. All times are local to the container's TZ.
+ * hour, and never after the start of work's hour. All times are local to the
+ * container's TZ.
  */
 
 const DAY_NAMES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];

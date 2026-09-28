@@ -110,3 +110,97 @@ test("a labelled notifier still sends nothing for a pulse with no window", async
 
   assert.deepEqual(sent, []);
 });
+
+const WEEK_RESET = new Date("2026-09-28T07:00:00.000Z");
+const WEEK_EPOCH = WEEK_RESET.getTime() / 1000;
+
+test("names the weekly limit when it is what blocks pulsing", () => {
+  const payload = buildWindowNotification({
+    success: false,
+    rateLimit: {
+      status: "rejected",
+      resetsAt: WEEK_RESET,
+      fiveHourResetsAt: null,
+      limitType: "seven_day",
+      weekly: { utilization: 1, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.equal(payload.title, "Weekly limit reached");
+  assert.equal(payload.level, "WARN");
+  // Days away, so the date matters as much as the countdown
+  assert.match(payload.description, new RegExp(`<t:${WEEK_EPOCH}:F>`));
+  assert.match(payload.description, new RegExp(`<t:${WEEK_EPOCH}:R>`));
+});
+
+test("recognises a weekly rejection by its reset time alone", () => {
+  const payload = buildWindowNotification({
+    success: false,
+    rateLimit: {
+      status: "rejected",
+      resetsAt: WEEK_RESET,
+      fiveHourResetsAt: null,
+      limitType: null,
+      weekly: { utilization: 1, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.equal(payload.title, "Weekly limit reached");
+});
+
+test("a 5-hour rejection is not the weekly limit", () => {
+  const payload = buildWindowNotification({
+    success: false,
+    rateLimit: {
+      status: "rejected",
+      resetsAt: RESET,
+      fiveHourResetsAt: RESET,
+      limitType: "five_hour",
+      weekly: { utilization: 0.4, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.equal(payload.title, "Usage limit reached");
+});
+
+test("an open window shows weekly usage", () => {
+  const payload = buildWindowNotification({
+    success: true,
+    rateLimit: {
+      status: "allowed",
+      resetsAt: RESET,
+      fiveHourResetsAt: RESET,
+      weekly: { utilization: 0.2, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.match(payload.description, new RegExp(`Weekly usage: 20% · resets <t:${WEEK_EPOCH}:R>`));
+});
+
+test("shows weekly usage above the limit as reported", () => {
+  const payload = buildWindowNotification({
+    success: true,
+    rateLimit: {
+      status: "allowed",
+      resetsAt: RESET,
+      fiveHourResetsAt: RESET,
+      weekly: { utilization: 1.04, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.match(payload.description, /Weekly usage: 104%/);
+});
+
+test("leaves weekly usage out when it is unknown", () => {
+  const payload = buildWindowNotification({
+    success: true,
+    rateLimit: {
+      status: "allowed",
+      resetsAt: RESET,
+      fiveHourResetsAt: RESET,
+      weekly: { utilization: null, resetsAt: WEEK_RESET },
+    },
+  });
+
+  assert.doesNotMatch(payload.description, /Weekly usage/);
+});

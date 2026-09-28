@@ -26,6 +26,44 @@ function isValidDate(value) {
   return value instanceof Date && !Number.isNaN(value.getTime());
 }
 
+/** Discord markup for a date and time days away: full date, then countdown. */
+function discordDateTime(date) {
+  const epoch = Math.floor(date.getTime() / 1000);
+  return `<t:${epoch}:F> (<t:${epoch}:R>)`;
+}
+
+/**
+ * Whether a rejected pulse is blocked by the weekly limit. The limit type is
+ * undocumented, so a reset matching the weekly window's also counts.
+ * @param {Object} rateLimit
+ * @returns {boolean}
+ */
+function isWeeklyRejection(rateLimit) {
+  if (rateLimit.limitType === "seven_day") {
+    return true;
+  }
+  const weeklyReset = rateLimit.weekly?.resetsAt;
+  return (
+    isValidDate(weeklyReset) &&
+    isValidDate(rateLimit.resetsAt) &&
+    weeklyReset.getTime() === rateLimit.resetsAt.getTime()
+  );
+}
+
+/**
+ * A line showing weekly usage, or "" when the weekly window is unknown.
+ * @param {?{utilization: ?number, resetsAt: ?Date}} weekly
+ * @returns {string}
+ */
+function weeklyUsageLine(weekly) {
+  if (!Number.isFinite(weekly?.utilization) || !isValidDate(weekly.resetsAt)) {
+    return "";
+  }
+  const percent = Math.round(weekly.utilization * 100);
+  const epoch = Math.floor(weekly.resetsAt.getTime() / 1000);
+  return `\nWeekly usage: ${percent}% · resets <t:${epoch}:R>`;
+}
+
 /**
  * Build the Discord payload announcing a pulse's window, or null when the
  * pulse reported no usable window.
@@ -42,6 +80,13 @@ export function buildWindowNotification(pulseResult) {
     if (!isValidDate(rateLimit.resetsAt)) {
       return null;
     }
+    if (isWeeklyRejection(rateLimit)) {
+      return {
+        title: "Weekly limit reached",
+        description: `Pulsing resumes when the weekly limit lifts on ${discordDateTime(rateLimit.resetsAt)}.`,
+        level: "WARN",
+      };
+    }
     return {
       title: "Usage limit reached",
       description: `Pulsing resumes when the limit lifts at ${discordTime(rateLimit.resetsAt)}.`,
@@ -55,7 +100,7 @@ export function buildWindowNotification(pulseResult) {
   }
   return {
     title: "Window open",
-    description: `The current window resets at ${discordTime(windowReset)}.`,
+    description: `The current window resets at ${discordTime(windowReset)}.${weeklyUsageLine(rateLimit.weekly)}`,
     level: "SUCCESS",
   };
 }

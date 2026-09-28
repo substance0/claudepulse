@@ -219,6 +219,7 @@ export class PulseScheduler {
           duration: result.message?.duration_ms,
           sessionId: result.message?.session_id,
           windowResetsAt: result.rateLimit?.fiveHourResetsAt?.toISOString(),
+          weeklyUsage: result.rateLimit?.weekly?.utilization ?? undefined,
           timerDurationMs: duration?.ms,
         });
 

@@ -36,3 +36,16 @@ test("keeps the explicit success and failure markers", () => {
   assert.match(formatPulse({ success: true }), /^success/);
   assert.match(formatPulse({ success: false, error: "x" }), /^failed/);
 });
+
+test("shows weekly usage after a successful pulse", () => {
+  const line = formatPulse({
+    windowResetsAt: "2026-09-24T13:50:00.000Z",
+    weeklyUsage: 0.2,
+  });
+
+  assert.match(line, /weekly=20%/);
+});
+
+test("leaves weekly usage out when unknown", () => {
+  assert.doesNotMatch(formatPulse({ weeklyUsage: undefined }), /weekly=/);
+});

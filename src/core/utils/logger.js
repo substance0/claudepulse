@@ -204,6 +204,9 @@ export class Logger {
             `resets=${DateUtility.formatLocalIso(new Date(data.resetsAt))}`,
           );
         }
+        if (Number.isFinite(data.weeklyUsage)) {
+          parts.push(`weekly=${Math.round(data.weeklyUsage * 100)}%`);
+        }
         if (data.cost !== undefined) parts.push(`cost=${data.cost}`);
         return parts.join(", ");
       }

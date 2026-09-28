@@ -5,6 +5,7 @@ import {
   parseClock,
   parseWorkDays,
   workHoursErrors,
+  workHoursWarnings,
 } from "../src/features/scheduling/workHours.js";
 
 test("reads a 24-hour clock time", () => {
@@ -79,4 +80,42 @@ test("rejects a day range with more than one dash", () => {
 
 test("accepts spaces around a range dash", () => {
   assert.deepEqual([...parseWorkDays("Mon - Fri")].sort(), [1, 2, 3, 4, 5]);
+});
+
+test("warns when work-hours settings are present but switched off", () => {
+  const warnings = workHoursWarnings({ WORK_START: "09:00", WORK_END: "19:00" });
+
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /WORK_HOURS_ENABLED/);
+  assert.match(warnings[0], /ignored/);
+});
+
+test("no warning for usual work hours", () => {
+  const warnings = workHoursWarnings({
+    WORK_HOURS_ENABLED: true,
+    WORK_START: "09:00",
+    WORK_END: "19:00",
+    HOURS_LEFT_AT_START: "2",
+  });
+
+  assert.deepEqual(warnings, []);
+});
+
+test("warns when the evening window can overlap the next day's first pulse", () => {
+  // First pulse 23:00:10 the evening before; a window opened at 22:29 is
+  // still open then
+  const warnings = workHoursWarnings({
+    WORK_HOURS_ENABLED: true,
+    WORK_START: "03:00",
+    WORK_END: "22:30",
+    HOURS_LEFT_AT_START: "1",
+  });
+
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /WORK_END/);
+  assert.match(warnings[0], /WORK_HOURS_ENABLED=false/);
+});
+
+test("no warning at all without work-hours settings", () => {
+  assert.deepEqual(workHoursWarnings({}), []);
 });

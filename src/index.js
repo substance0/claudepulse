@@ -9,7 +9,10 @@ import {
 } from "./core/config/index.js";
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
 import { createWindowNotifier } from "./core/services/windowNotification.js";
-import { createWorkHoursFromConfig } from "./features/scheduling/workHours.js";
+import {
+  createWorkHoursFromConfig,
+  workHoursWarnings,
+} from "./features/scheduling/workHours.js";
 import { displayBanner } from "./core/utils/banner.js";
 import fs from "fs/promises";
 import path from "path";
@@ -163,6 +166,10 @@ async function main() {
       "Environment Configuration",
       redactConfigSecrets(config),
     );
+
+    for (const warning of workHoursWarnings(config)) {
+      logger.warn("config", warning);
+    }
 
     // Log local timezone information
     const now = new Date();

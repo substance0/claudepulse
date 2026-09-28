@@ -100,8 +100,47 @@ export function workHoursErrors(config) {
   return errors;
 }
 
+/**
+ * Warnings about work-hours settings that are valid but likely not what the
+ * operator wants. They never stop ClaudePulse.
+ * @param {Object} config - Configuration that passed workHoursErrors()
+ * @returns {string[]}
+ */
+export function workHoursWarnings(config) {
+  const settingsPresent = ["WORK_START", "WORK_END", "WORK_DAYS", "HOURS_LEFT_AT_START"]
+    .some((key) => config[key] !== undefined);
+
+  if (config.WORK_HOURS_ENABLED !== true) {
+    return settingsPresent
+      ? ["Work-hours settings are set but WORK_HOURS_ENABLED is not true, so they are ignored"]
+      : [];
+  }
+
+  const start = parseClock(config.WORK_START);
+  const end = parseClock(config.WORK_END);
+  if (!start || !end) {
+    return [];
+  }
+
+  // A window opened just before WORK_END lasts 5 hours. If the next working
+  // day's first pulse comes sooner, that window is still open and the morning
+  // starts with fewer hours left than asked.
+  const hoursLeft = Number(config.HOURS_LEFT_AT_START ?? WINDOW_HOURS);
+  const nextStartMinutes =
+    MINUTES_PER_DAY + start.hour * 60 + start.minute + (hoursLeft - WINDOW_HOURS) * 60;
+  const offMinutes = nextStartMinutes - (end.hour * 60 + end.minute);
+  if (offMinutes >= WINDOW_HOURS * 60) {
+    return [];
+  }
+
+  return [
+    `Work hours leave ${offMinutes} minutes between WORK_END (${config.WORK_END}) and the next day's first pulse, less than the 5 hours a window lasts: mornings may start with fewer than ${hoursLeft} ${hoursLeft === 1 ? "hour" : "hours"} left. Set WORK_END at least 5 hours before the first pulse, or turn work hours off with WORK_HOURS_ENABLED=false, since so little time off gains almost nothing.`,
+  ];
+}
+
 const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_HOURS = 5;
+const MINUTES_PER_DAY = 24 * 60;
 /** Second of the minute pulses fire at, clear of the reset boundary. */
 const PULSE_SECOND = 10;
 /** Working days searched ahead: enough to reach any day of the week. */

@@ -81,13 +81,15 @@ export function buildExpiryWarning(days, expiresAt, label) {
 }
 
 /**
- * Create a monitor that sends each due warning once.
+ * Create a monitor that delivers each due warning once. A warning Discord did
+ * not accept is retried at the next check; each warning is logged only once.
  * @param {Object} options
  * @param {Date} options.expiresAt
  * @param {string|undefined} options.webhookUrl - Discord webhook; log only when unset
  * @param {string} [options.label] - Account label
  * @param {{warn: Function}} options.logger
- * @param {Function} [options.send] - Discord sender (overridable in tests)
+ * @param {(payload: Object, url: string) => Promise<boolean>} [options.send] -
+ *   Discord sender reporting delivery (overridable in tests)
  * @param {() => Date} [options.now] - Clock (overridable in tests)
  * @returns {{check: () => Promise<void>}}
  */
@@ -99,25 +101,32 @@ export function createTokenExpiryMonitor({
   send = sendDiscordAlert,
   now = () => new Date(),
 }) {
-  const sentThresholds = new Set();
+  const loggedThresholds = new Set();
+  const deliveredThresholds = new Set();
 
   return {
     async check() {
       const days = daysLeft(expiresAt, now());
       const threshold = dueThreshold(days);
-      if (threshold === null || sentThresholds.has(threshold)) {
+      if (threshold === null || deliveredThresholds.has(threshold)) {
         return;
       }
-      sentThresholds.add(threshold);
 
       const warning = buildExpiryWarning(days, expiresAt, label);
-      // Logged at warn even once expired: logger.error posts to the error
-      // webhook itself, which would duplicate the alert sent below.
-      logger.warn("token", warning.title, {
-        expiresAt: expiresAt.toISOString(),
-        daysLeft: days,
-      });
-      await send(warning, webhookUrl);
+      if (!loggedThresholds.has(threshold)) {
+        loggedThresholds.add(threshold);
+        // Logged at warn even once expired: logger.error posts to the error
+        // webhook itself, which would duplicate the alert sent below.
+        logger.warn("token", warning.title, {
+          expiresAt: expiresAt.toISOString(),
+          daysLeft: days,
+        });
+      }
+
+      // Without a webhook the log is the only channel, and it is done.
+      if (!webhookUrl || (await send(warning, webhookUrl))) {
+        deliveredThresholds.add(threshold);
+      }
     },
   };
 }

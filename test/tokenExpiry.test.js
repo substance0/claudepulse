@@ -112,3 +112,46 @@ test("logs each warning too", async () => {
 
   assert.deepEqual(warned, ["Claude token expires in 3 days"]);
 });
+
+test("retries a warning Discord did not accept, logging it once", async () => {
+  // Arrange: the first delivery fails, the next succeeds
+  const now = { value: new Date(EXPIRY.getTime() - 0.5 * DAY_MS) };
+  const attempts = [];
+  const warned = [];
+  const results = [false, true];
+  const monitor = createTokenExpiryMonitor({
+    expiresAt: EXPIRY,
+    webhookUrl: "https://discord.test/hook",
+    logger: { warn: (_c, message) => warned.push(message) },
+    send: async (payload) => {
+      attempts.push(payload.title);
+      return results.shift();
+    },
+    now: () => now.value,
+  });
+
+  // Act: three hourly checks
+  await monitor.check();
+  await monitor.check();
+  await monitor.check();
+
+  // Assert: retried until delivered, then quiet; logged once
+  assert.deepEqual(attempts, ["Claude token expires in 1 day", "Claude token expires in 1 day"]);
+  assert.deepEqual(warned, ["Claude token expires in 1 day"]);
+});
+
+test("without a webhook, logs each warning once", async () => {
+  const warned = [];
+  const monitor = createTokenExpiryMonitor({
+    expiresAt: EXPIRY,
+    webhookUrl: undefined,
+    logger: { warn: (_c, message) => warned.push(message) },
+    send: async () => false,
+    now: () => new Date(EXPIRY.getTime() - 3 * DAY_MS),
+  });
+
+  await monitor.check();
+  await monitor.check();
+
+  assert.deepEqual(warned, ["Claude token expires in 3 days"]);
+});

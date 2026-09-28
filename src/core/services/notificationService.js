@@ -22,12 +22,13 @@ const EMBED_COLORS = {
  * @param {Array<{name: string, value: string, inline?: boolean}>} payload.fields - Embed fields
  * @param {string} payload.timestamp - ISO timestamp
  * @param {string} webhookUrl - Discord webhook URL
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>} Whether Discord accepted the alert; false when
+ *   no webhook is configured, the request failed, or Discord refused it
  */
 export async function sendDiscordAlert(payload, webhookUrl) {
   if (!webhookUrl) {
     // Silently skip if no webhook configured
-    return;
+    return false;
   }
 
   const {
@@ -68,9 +69,11 @@ export async function sendDiscordAlert(payload, webhookUrl) {
         `Discord webhook failed: ${response.status} ${response.statusText}`,
       );
     }
+    return response.ok;
   } catch (error) {
     // Gracefully handle network errors
     console.error(`Failed to send Discord notification: ${error.message}`);
+    return false;
   }
 }
 

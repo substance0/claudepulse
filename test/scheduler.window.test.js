@@ -200,3 +200,26 @@ test("falls back to hourly discovery after a pulse that reported no window", asy
 
   assert.equal(record.scheduled.at(-1).strategy, "discovery");
 });
+
+const AUTH_FAILURE = {
+  success: false,
+  authFailure: true,
+  error: "API Error: 401 authentication_error",
+  rateLimit: null,
+};
+
+test("a rejected token's alert says how to renew it", async () => {
+  const { scheduler, record } = buildScheduler(AUTH_FAILURE);
+
+  await cycleAndSchedule(scheduler);
+
+  assert.match(record.alerts[0], /claude setup-token/);
+});
+
+test("a rejected token at startup says how to renew it", async () => {
+  const { scheduler, record } = buildScheduler(AUTH_FAILURE);
+
+  await scheduler._sendInitialPulse();
+
+  assert.match(record.alerts[0], /claude setup-token/);
+});

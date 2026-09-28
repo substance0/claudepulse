@@ -71,6 +71,10 @@ function isUnrecoverableAuthError(error) {
   return namesAuthProblem || rejectedByStatus;
 }
 
+/** Alert text for a token the API no longer accepts. */
+const TOKEN_REJECTED_MESSAGE =
+  "Token rejected - run `claude setup-token`, update claudepulse.env and recreate the container";
+
 /**
  * Whether a pulse was refused because a usage window is exhausted.
  * @param {Object} pulseResult - Result from _sendPulse()
@@ -404,10 +408,7 @@ export class PulseScheduler {
       // An expired or rejected token cannot be fixed by sending again, so
       // abandon the cycle instead of burning the remaining attempts.
       if (isUnrecoverableAuthError(result.error)) {
-        this._failCycle(
-          "Authentication rejected - re-authenticate to resume pulsing",
-          { error: result.error },
-        );
+        this._failCycle(TOKEN_REJECTED_MESSAGE, { error: result.error });
         return;
       }
 
@@ -594,7 +595,12 @@ export class PulseScheduler {
       } else {
         // A failure at startup is exactly when an alert matters most: a
         // container restarted with a dead token should say so immediately.
-        this._failCycle("Initial pulse failed", { error: result.error });
+        this._failCycle(
+          isUnrecoverableAuthError(result.error)
+            ? TOKEN_REJECTED_MESSAGE
+            : "Initial pulse failed",
+          { error: result.error },
+        );
       }
     } catch (error) {
       this._failCycle("Initial pulse failed", { error: error.message });

@@ -221,3 +221,44 @@ test("does not mistake a successful pulse for an auth failure", () => {
 
   assert.equal(r.authFailure, false);
 });
+
+test("reads the weekly window reported by a pulse", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(rateLimitLine(OBSERVED_EVENT), SUCCESS_JSON),
+    stderr: "",
+    exitCode: 0,
+  });
+
+  assert.equal(r.rateLimit.weekly.utilization, 0.2);
+  assert.equal(r.rateLimit.weekly.resetsAt.getTime(), SEVEN_DAY_RESET * 1000);
+  assert.equal(r.rateLimit.limitType, "five_hour");
+});
+
+test("reports no weekly window when the event has none", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(rateLimitLine({ status: "allowed", resetsAt: FIVE_HOUR_RESET }), SUCCESS_JSON),
+    stderr: "",
+    exitCode: 0,
+  });
+
+  assert.equal(r.rateLimit.weekly, null);
+  assert.equal(r.rateLimit.limitType, null);
+});
+
+test("keeps a weekly window that reports no utilization", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(
+      rateLimitLine({
+        status: "allowed",
+        resetsAt: FIVE_HOUR_RESET,
+        unifiedWindows: { seven_day: { resetsAt: SEVEN_DAY_RESET } },
+      }),
+      SUCCESS_JSON,
+    ),
+    stderr: "",
+    exitCode: 0,
+  });
+
+  assert.equal(r.rateLimit.weekly.utilization, null);
+  assert.equal(r.rateLimit.weekly.resetsAt.getTime(), SEVEN_DAY_RESET * 1000);
+});

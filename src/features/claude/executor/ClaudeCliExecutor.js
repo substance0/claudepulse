@@ -68,7 +68,7 @@ function fromEpochSeconds(seconds) {
  * and `unifiedWindows` appear in real output but are not, so they are read
  * when present and never required.
  * @param {Object[]} lines - Parsed stream lines
- * @returns {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null}|null}
+ * @returns {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null, limitType: string|null, weekly: {utilization: number|null, resetsAt: Date|null}|null}|null}
  */
 function extractRateLimit(lines) {
   const event = lines
@@ -85,12 +85,23 @@ function extractRateLimit(lines) {
   const resetsAtIsFiveHour =
     info.rateLimitType === undefined || info.rateLimitType === "five_hour";
 
+  const sevenDay = info.unifiedWindows?.seven_day;
+
   return {
     status: info.status,
     resetsAt: fromEpochSeconds(info.resetsAt),
     fiveHourResetsAt:
       fromEpochSeconds(info.unifiedWindows?.five_hour?.resetsAt) ??
       (resetsAtIsFiveHour ? fromEpochSeconds(info.resetsAt) : null),
+    limitType: info.rateLimitType ?? null,
+    weekly: sevenDay
+      ? {
+          utilization: Number.isFinite(sevenDay.utilization)
+            ? sevenDay.utilization
+            : null,
+          resetsAt: fromEpochSeconds(sevenDay.resetsAt),
+        }
+      : null,
   };
 }
 

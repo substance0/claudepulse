@@ -58,21 +58,24 @@ Goal: at the start of the working day, the current window has a chosen number
 of hours left, and the next reset follows soon after, so the morning gets two
 budgets. No pulses outside working hours or on days off.
 
-Settings (all optional; the feature is on when `WORK_START` is set):
+Settings. The feature is opt-in: it is on only with `WORK_HOURS_ENABLED=true`,
+and the other settings are ignored while it is off.
 
 | Setting               | Format          | Default  | Meaning                                    |
 | --------------------- | --------------- | -------- | ------------------------------------------ |
-| `WORK_START`          | `HH:MM`         | unset    | When the working day starts (local `TZ`)   |
-| `WORK_END`            | `HH:MM`         | required with `WORK_START` | No window starts at or after this time |
-| `HOURS_LEFT_AT_START` | integer 1–5     | `5`      | Hours left in the window at `WORK_START`, at least |
+| `WORK_HOURS_ENABLED`  | `true`/`false`  | `false`  | Turns work hours on                        |
+| `WORK_START`          | `HH:MM`         | required when on | When the working day starts (local `TZ`) |
+| `WORK_END`            | `HH:MM`         | required when on | No window starts at or after this time |
+| `HOURS_LEFT_AT_START` | integer 1–5     | `5`      | Hours left in the window at `WORK_START`   |
 | `WORK_DAYS`           | e.g. `Mon-Fri`  | every day | Days with a working day; ranges and commas, e.g. `Mon-Thu,Sat` |
 
 Rules:
 
-- **Day-start pulse.** Target reset = `WORK_START + HOURS_LEFT_AT_START`,
-  rounded up to the hour. The day-start pulse fires at target reset − 5 h, at
-  `:00:10`. `09:00` + 2 → reset 11:00 → pulse 06:00:10. `09:30` + 2 → reset
-  12:00 → pulse 07:00:10 (2.5 h left).
+- **Day-start pulse.** A window resets 5 hours after the minute of the pulse
+  that opens it (observed in production). The day-start pulse fires at
+  `WORK_START + HOURS_LEFT_AT_START − 5 h + 10 s`, with the 5 hours in real
+  time so daylight-saving days keep the exact hours left. `09:00` + 2 →
+  06:00:10 → reset 11:00. `09:30` + 2 → 06:30:10 → reset 11:30.
 - **Active period** of a working day: from its day-start pulse (inclusive) to
   `WORK_END` (exclusive). It may begin the previous calendar day when
   `WORK_START` is early; the working day's weekday decides `WORK_DAYS`.
@@ -82,11 +85,17 @@ Rules:
   rejected limit lifts", because the result is never earlier than `t`.
 - **Startup.** The startup pulse is sent only inside an active period.
   Outside, the scheduler logs the next day-start pulse and waits.
-- **Validation.** `WORK_END` must be after `WORK_START` on the same day.
-  `WORK_START` and `SCHEDULED_START_HOUR` cannot both be set.
-  `WORK_END`, `WORK_DAYS` and `HOURS_LEFT_AT_START` require `WORK_START`.
+- **Retries.** A failing cycle stops retrying once outside an active period;
+  the failure still counts toward alerts.
+- **Validation (when on).** `WORK_START` and `WORK_END` are required;
+  `WORK_END` must be after `WORK_START` on the same day; work hours and
+  `SCHEDULED_START_HOUR` cannot both be set.
+- **Warnings (never blocking).** Settings present while the feature is off;
+  less than 5 hours between `WORK_END` and the next day-start pulse, which
+  lets the evening window overlap the morning (suggests an earlier
+  `WORK_END` or switching work hours off).
 - A newly scheduled time moved by the constraint is logged with strategy
-  `work_hours`.
+  `work_hours`, with a line naming the old and new times.
 
 ## 3. Weekly limit awareness (T46)
 

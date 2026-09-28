@@ -7,7 +7,8 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | Variable                     | Type    | Default         | Description                                     |
 | ---------------------------- | ------- | --------------- | ----------------------------------------------- |
 | `SCHEDULED_START_HOUR`       | Number  | `unset`         | Hour for first pulse only (0-23)                |
-| `WORK_START`                 | String  | `unset`         | Working day start (`HH:MM`); turns work hours on |
+| `WORK_HOURS_ENABLED`         | Boolean | `false`         | Turns work hours on                             |
+| `WORK_START`                 | String  | `unset`         | Working day start (`HH:MM`)                     |
 | `WORK_END`                   | String  | `unset`         | No window starts at or after (`HH:MM`)          |
 | `HOURS_LEFT_AT_START`        | Number  | `5`             | Hours left at `WORK_START` (1-5)                |
 | `WORK_DAYS`                  | String  | every day       | Working days, e.g. `Mon-Fri`                    |
@@ -57,29 +58,38 @@ SCHEDULED_START_HOUR=4
 **Purpose:** Pulse only during your working day, and open its first window
 early so part of it is left when you start, followed soon by a fresh one.
 
+Work hours are off unless `WORK_HOURS_ENABLED=true`. While off, the other
+settings are ignored, so they can stay in place; a startup warning says so.
+
 | Setting               | Format                              | Default                    |
 | --------------------- | ----------------------------------- | -------------------------- |
-| `WORK_START`          | `HH:MM`                             | unset                      |
-| `WORK_END`            | `HH:MM`                             | required with `WORK_START` |
+| `WORK_HOURS_ENABLED`  | `true` / `false`                    | `false`                    |
+| `WORK_START`          | `HH:MM`                             | required when enabled      |
+| `WORK_END`            | `HH:MM`                             | required when enabled      |
 | `HOURS_LEFT_AT_START` | 1-5                                 | `5`                        |
 | `WORK_DAYS`           | `Mon-Fri`, `Mon-Thu,Sat`, `Fri-Mon` | every day                  |
 
-A window lasts about 5 hours from the pulse that opens it. The day's first
-pulse fires 5 hours before `WORK_START + HOURS_LEFT_AT_START`, rounded up to
-the hour. With `WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, it fires at
-06:00:10: its window resets around 11:00, leaving 2 hours at 09:00, and the
-next window opens right after. Pulses then follow each reported reset until
-`WORK_END`; none is sent at night or on other days, and none at startup
-outside these hours.
+A window resets 5 hours after the minute of the pulse that opens it. The
+day's first pulse fires 5 hours before `WORK_START + HOURS_LEFT_AT_START`.
+With `WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, it fires at 06:00:10:
+its window resets at 11:00, leaving 2 hours at 09:00, and the next window
+opens right after. `09:30` with 2 fires at 06:30:10 and leaves 2 hours too.
+Pulses then follow each reported reset until `WORK_END`; none is sent at
+night or on other days, none at startup outside these hours, and a failing
+pulse is not retried after `WORK_END`.
 
-With a start that is not on the hour, the window has at least
-`HOURS_LEFT_AT_START` hours left: `09:30` with 2 opens at 07:00:10, leaving
-about 2.5 hours. The first pulse never fires after the start of work's hour,
-so `09:30` with the default 5 opens at 09:00:10, leaving about 4.5 hours.
+The 5 hours are real hours, so the hours left stay exact on the days the
+clocks change.
 
-`WORK_START` and `SCHEDULED_START_HOUR` cannot both be set.
+A window opened just before `WORK_END` lasts 5 hours. If the next day's first
+pulse comes sooner, a startup warning explains that mornings may start with
+fewer hours left, and suggests an earlier `WORK_END` or switching work hours
+off.
+
+`WORK_HOURS_ENABLED=true` and `SCHEDULED_START_HOUR` cannot both be set.
 
 ```bash
+WORK_HOURS_ENABLED=true
 WORK_START=09:00
 WORK_END=19:00
 HOURS_LEFT_AT_START=2

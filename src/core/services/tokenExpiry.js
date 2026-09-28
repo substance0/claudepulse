@@ -1,0 +1,123 @@
+/**
+ * Token Expiry Warnings
+ * The token from `claude setup-token` lasts a year and ClaudePulse cannot
+ * read its expiry, so the operator records it in TOKEN_EXPIRES_AT. Warnings
+ * go out as expiry approaches, once per threshold.
+ */
+
+import { sendDiscordAlert } from "./notificationService.js";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Days left at which a warning is sent; 0 means expired. */
+export const WARNING_THRESHOLDS_DAYS = [14, 7, 1, 0];
+
+/**
+ * Parse YYYY-MM-DD as local midnight at the start of that day.
+ * @param {string} text
+ * @returns {Date|null} Null for a malformed or non-existent date
+ */
+export function parseExpiryDate(text) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text ?? "");
+  if (!match) {
+    return null;
+  }
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(year, month - 1, day);
+  const exists =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day;
+  return exists ? date : null;
+}
+
+/**
+ * Whole days left before expiry; a partial day counts as a full one.
+ * @param {Date} expiresAt
+ * @param {Date} now
+ * @returns {number} 0 or less once expired
+ */
+export function daysLeft(expiresAt, now) {
+  return Math.ceil((expiresAt.getTime() - now.getTime()) / DAY_MS);
+}
+
+/**
+ * The warning threshold that applies with this many days left.
+ * @param {number} days
+ * @returns {number|null} Null when no warning applies yet
+ */
+export function dueThreshold(days) {
+  if (days <= 0) {
+    return 0;
+  }
+  const above = WARNING_THRESHOLDS_DAYS.filter((t) => t > 0 && t >= days);
+  return above.length > 0 ? Math.min(...above) : null;
+}
+
+/**
+ * The Discord payload warning about expiry.
+ * @param {number} days - Days left, 0 or less once expired
+ * @param {Date} expiresAt
+ * @param {string} [label] - Account label prefixed to the title
+ * @returns {{title: string, description: string, level: string}}
+ */
+export function buildExpiryWarning(days, expiresAt, label) {
+  const epoch = Math.floor(expiresAt.getTime() / 1000);
+  const renew =
+    "Run `claude setup-token`, replace CLAUDE_CODE_OAUTH_TOKEN in claudepulse.env, update TOKEN_EXPIRES_AT and recreate the container.";
+  const title =
+    days <= 0
+      ? "Claude token expired"
+      : `Claude token expires in ${days} ${days === 1 ? "day" : "days"}`;
+
+  return {
+    title: label ? `${label} · ${title}` : title,
+    description:
+      days <= 0
+        ? `Pulses fail until the token is renewed. ${renew}`
+        : `It expires on <t:${epoch}:D>. ${renew}`,
+    level: days <= 0 ? "ERROR" : "WARN",
+  };
+}
+
+/**
+ * Create a monitor that sends each due warning once.
+ * @param {Object} options
+ * @param {Date} options.expiresAt
+ * @param {string|undefined} options.webhookUrl - Discord webhook; log only when unset
+ * @param {string} [options.label] - Account label
+ * @param {{warn: Function}} options.logger
+ * @param {Function} [options.send] - Discord sender (overridable in tests)
+ * @param {() => Date} [options.now] - Clock (overridable in tests)
+ * @returns {{check: () => Promise<void>}}
+ */
+export function createTokenExpiryMonitor({
+  expiresAt,
+  webhookUrl,
+  label,
+  logger,
+  send = sendDiscordAlert,
+  now = () => new Date(),
+}) {
+  const sentThresholds = new Set();
+
+  return {
+    async check() {
+      const days = daysLeft(expiresAt, now());
+      const threshold = dueThreshold(days);
+      if (threshold === null || sentThresholds.has(threshold)) {
+        return;
+      }
+      sentThresholds.add(threshold);
+
+      const warning = buildExpiryWarning(days, expiresAt, label);
+      // Logged at warn even once expired: logger.error posts to the error
+      // webhook itself, which would duplicate the alert sent below.
+      logger.warn("token", warning.title, {
+        expiresAt: expiresAt.toISOString(),
+        daysLeft: days,
+      });
+      await send(warning, webhookUrl);
+    },
+  };
+}

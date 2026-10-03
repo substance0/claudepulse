@@ -61,14 +61,47 @@ function fromEpochSeconds(seconds) {
   return Number.isFinite(seconds) ? new Date(seconds * 1000) : null;
 }
 
-/** rate_limit_info fields ClaudePulse understands. */
+/**
+ * rate_limit_info fields ClaudePulse understands. The extra-usage ones are
+ * sent on every pulse, so they are read rather than reported as unknown.
+ */
 const KNOWN_RATE_LIMIT_FIELDS = new Set([
   "status",
   "resetsAt",
   "utilization",
   "rateLimitType",
   "unifiedWindows",
+  "overageStatus",
+  "overageResetsAt",
+  "overageDisabledReason",
+  "isUsingOverage",
 ]);
+
+/**
+ * Extra-usage state from rate_limit_info: whether paid extra usage is being
+ * drawn on, and whether the account allows it. Null when the event carries
+ * none of it.
+ * @param {Object} info
+ * @returns {{status: string|null, disabledReason: string|null, using: boolean|null, resetsAt: Date|null}|null}
+ */
+function extractOverage(info) {
+  const present = [
+    info.overageStatus,
+    info.overageDisabledReason,
+    info.isUsingOverage,
+    info.overageResetsAt,
+  ].some((value) => value !== undefined);
+  if (!present) {
+    return null;
+  }
+
+  return {
+    status: info.overageStatus ?? null,
+    disabledReason: info.overageDisabledReason ?? null,
+    using: typeof info.isUsingOverage === "boolean" ? info.isUsingOverage : null,
+    resetsAt: fromEpochSeconds(info.overageResetsAt),
+  };
+}
 
 /**
  * The rate_limit_info fields ClaudePulse does not understand, with their
@@ -90,7 +123,7 @@ function unrecognisedFields(info) {
  * and `unifiedWindows` appear in real output but are not, so they are read
  * when present and never required.
  * @param {Object[]} lines - Parsed stream lines
- * @returns {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null, limitType: string|null, weekly: {utilization: number|null, resetsAt: Date|null}|null, unrecognised: Object|null}|null}
+ * @returns {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null, limitType: string|null, weekly: {utilization: number|null, resetsAt: Date|null}|null, overage: Object|null, unrecognised: Object|null}|null}
  */
 function extractRateLimit(lines) {
   const event = lines
@@ -124,6 +157,7 @@ function extractRateLimit(lines) {
           resetsAt: fromEpochSeconds(sevenDay.resetsAt),
         }
       : null,
+    overage: extractOverage(info),
     unrecognised: unrecognisedFields(info),
   };
 }

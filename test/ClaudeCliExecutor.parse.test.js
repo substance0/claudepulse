@@ -104,10 +104,14 @@ function stream(...lines) {
   return lines.join("\n") + "\n";
 }
 
+// Captured from a real pulse on an account without extra-usage credits
 const OBSERVED_EVENT = {
   status: "allowed",
   resetsAt: FIVE_HOUR_RESET,
   rateLimitType: "five_hour",
+  overageStatus: "rejected",
+  overageDisabledReason: "out_of_credits",
+  isUsingOverage: false,
   unifiedWindows: {
     five_hour: { utilization: 0.48, resetsAt: FIVE_HOUR_RESET },
     seven_day: { utilization: 0.2, resetsAt: SEVEN_DAY_RESET },
@@ -268,6 +272,43 @@ test("keeps rate-limit fields it does not know", () => {
     stdout: stream(
       rateLimitLine({
         ...OBSERVED_EVENT,
+        overageInUse: true,
+        surpassedThreshold: 0.9,
+      }),
+      SUCCESS_JSON,
+    ),
+    stderr: "",
+    exitCode: 0,
+  });
+
+  assert.deepEqual(r.rateLimit.unrecognised, {
+    overageInUse: true,
+    surpassedThreshold: 0.9,
+  });
+});
+
+test("reads extra-usage state from a normal pulse", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(rateLimitLine(OBSERVED_EVENT), SUCCESS_JSON),
+    stderr: "",
+    exitCode: 0,
+  });
+
+  assert.deepEqual(r.rateLimit.overage, {
+    status: "rejected",
+    disabledReason: "out_of_credits",
+    using: false,
+    resetsAt: null,
+  });
+});
+
+test("reads extra usage being in use, with its reset time", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(
+      rateLimitLine({
+        status: "rejected",
+        resetsAt: FIVE_HOUR_RESET,
+        overageStatus: "allowed",
         isUsingOverage: true,
         overageResetsAt: SEVEN_DAY_RESET,
       }),
@@ -277,10 +318,20 @@ test("keeps rate-limit fields it does not know", () => {
     exitCode: 0,
   });
 
-  assert.deepEqual(r.rateLimit.unrecognised, {
-    isUsingOverage: true,
-    overageResetsAt: SEVEN_DAY_RESET,
+  assert.equal(r.rateLimit.overage.using, true);
+  assert.equal(r.rateLimit.overage.status, "allowed");
+  assert.equal(r.rateLimit.overage.resetsAt.getTime(), SEVEN_DAY_RESET * 1000);
+  assert.equal(r.rateLimit.unrecognised, null);
+});
+
+test("reports no extra-usage state when the event has none", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(rateLimitLine({ status: "allowed", resetsAt: FIVE_HOUR_RESET }), SUCCESS_JSON),
+    stderr: "",
+    exitCode: 0,
   });
+
+  assert.equal(r.rateLimit.overage, null);
 });
 
 test("reports no unknown fields for the observed event", () => {

@@ -154,7 +154,7 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 | ---------------------------- | ------------- | ---------------------------------------------------------------------- |
 | `TZ`                         | `UTC`         | Time zone for logs, work hours and `SCHEDULED_START_HOUR`              |
 | `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
-| `TOKEN_EXPIRES_AT`           | unset         | Token expiry (`YYYY-MM-DD`); Discord warnings 14, 7 and 1 day before   |
+| `TOKEN_EXPIRES_AT`           | unset         | Token expiry (`YYYY-MM-DD`); warnings 14, 7 and 1 day before, and once expired |
 | `WORK_HOURS_ENABLED`         | `false`       | Turns work hours on (see [Work Hours](ENVIRONMENT.md#work-hours))       |
 | `WORK_START`                 | unset         | When your working day starts (`HH:MM`); required when enabled          |
 | `WORK_END`                   | unset         | No window starts at or after this time (`HH:MM`); required when enabled |
@@ -175,14 +175,14 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 | Variable                     | Required | Description                                          |
 | ---------------------------- | -------- | ---------------------------------------------------- |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | yes      | Token from `claude setup-token`                      |
-| `DISCORD_WEBHOOK_URL`        | no       | Discord webhook for error alerts                     |
+| `DISCORD_WEBHOOK_URL`        | no       | Discord webhook for error alerts and token expiry warnings |
 | `DISCORD_WINDOW_WEBHOOK_URL` | no       | Discord webhook announcing each window's reset time  |
 
 ### Discord Notifications (Optional)
 
 ClaudePulse can post to two Discord webhooks:
 
-- **Error alerts** (`DISCORD_WEBHOOK_URL`): failed pulses and other errors, spaced out during an outage.
+- **Error alerts** (`DISCORD_WEBHOOK_URL`): failed pulses and other errors, spaced out during an outage, plus token expiry warnings when `TOKEN_EXPIRES_AT` is set.
 - **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, or "Weekly limit reached" with the date it lifts. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
 
 To set one up:

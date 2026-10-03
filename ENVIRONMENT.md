@@ -21,7 +21,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `DRY_RUN`                    | Boolean | `false`         | Test mode - analyze schedule without sending    |
 | `KEEP_PULSE_ON_FAILURE`      | Boolean | `false`         | Keep container running on auth failures         |
 | `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Pulse at startup to learn the current window    |
-| `DISCORD_WEBHOOK_URL`        | String  | `unset`         | Discord webhook URL for error notifications     |
+| `DISCORD_WEBHOOK_URL`        | String  | `unset`         | Discord webhook for errors and token warnings   |
 | `DISCORD_WINDOW_WEBHOOK_URL` | String  | `unset`         | Discord webhook announcing window reset times   |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | String  | required        | Token from `claude setup-token`                 |
 | `TOKEN_EXPIRES_AT`           | Date    | `unset`         | Token expiry (`YYYY-MM-DD`) for warnings        |
@@ -371,7 +371,8 @@ TOKEN_EXPIRES_AT=2027-09-25
 - Sends rich embeds to Discord channel on ERROR level logs
 - Includes error details, category, timestamp, and context
 - Non-blocking (failures don't affect application)
-- Only triggers on actual errors (not INFO/WARN logs)
+- Only triggers on actual errors (not INFO/WARN logs), plus the token expiry
+  warnings described under `TOKEN_EXPIRES_AT`
 - Repeated pulse failures alert at widening intervals — on the 1st, 2nd, 4th,
   8th consecutive failure and so on — instead of once per cycle. A sustained
   outage therefore stays visible without flooding the channel, and the counter

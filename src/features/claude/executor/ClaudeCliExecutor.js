@@ -61,6 +61,28 @@ function fromEpochSeconds(seconds) {
   return Number.isFinite(seconds) ? new Date(seconds * 1000) : null;
 }
 
+/** rate_limit_info fields ClaudePulse understands. */
+const KNOWN_RATE_LIMIT_FIELDS = new Set([
+  "status",
+  "resetsAt",
+  "utilization",
+  "rateLimitType",
+  "unifiedWindows",
+]);
+
+/**
+ * The rate_limit_info fields ClaudePulse does not understand, with their
+ * values, or null when there are none.
+ * @param {Object} info
+ * @returns {Object|null}
+ */
+function unrecognisedFields(info) {
+  const entries = Object.entries(info).filter(
+    ([name]) => !KNOWN_RATE_LIMIT_FIELDS.has(name),
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
+
 /**
  * Extract the rate-limit state from the last rate_limit_event in a stream.
  *
@@ -68,7 +90,7 @@ function fromEpochSeconds(seconds) {
  * and `unifiedWindows` appear in real output but are not, so they are read
  * when present and never required.
  * @param {Object[]} lines - Parsed stream lines
- * @returns {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null, limitType: string|null, weekly: {utilization: number|null, resetsAt: Date|null}|null}|null}
+ * @returns {{status: string, resetsAt: Date|null, fiveHourResetsAt: Date|null, limitType: string|null, weekly: {utilization: number|null, resetsAt: Date|null}|null, unrecognised: Object|null}|null}
  */
 function extractRateLimit(lines) {
   const event = lines
@@ -102,6 +124,7 @@ function extractRateLimit(lines) {
           resetsAt: fromEpochSeconds(sevenDay.resetsAt),
         }
       : null,
+    unrecognised: unrecognisedFields(info),
   };
 }
 

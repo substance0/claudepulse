@@ -262,3 +262,33 @@ test("keeps a weekly window that reports no utilization", () => {
   assert.equal(r.rateLimit.weekly.utilization, null);
   assert.equal(r.rateLimit.weekly.resetsAt.getTime(), SEVEN_DAY_RESET * 1000);
 });
+
+test("keeps rate-limit fields it does not know", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(
+      rateLimitLine({
+        ...OBSERVED_EVENT,
+        isUsingOverage: true,
+        overageResetsAt: SEVEN_DAY_RESET,
+      }),
+      SUCCESS_JSON,
+    ),
+    stderr: "",
+    exitCode: 0,
+  });
+
+  assert.deepEqual(r.rateLimit.unrecognised, {
+    isUsingOverage: true,
+    overageResetsAt: SEVEN_DAY_RESET,
+  });
+});
+
+test("reports no unknown fields for the observed event", () => {
+  const r = ClaudeCliExecutor.parseResult({
+    stdout: stream(rateLimitLine(OBSERVED_EVENT), SUCCESS_JSON),
+    stderr: "",
+    exitCode: 0,
+  });
+
+  assert.equal(r.rateLimit.unrecognised, null);
+});

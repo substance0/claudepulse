@@ -204,6 +204,7 @@ export class Logger {
             `resets=${DateUtility.formatLocalIso(new Date(data.resetsAt))}`,
           );
         }
+        if (data.usingOverage) parts.push("overage=on");
         if (data.limit) parts.push(`limit=${data.limit}`);
         if (Number.isFinite(data.weeklyUsage)) {
           parts.push(`weekly=${Math.round(data.weeklyUsage * 100)}%`);

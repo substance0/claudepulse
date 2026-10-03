@@ -71,6 +71,12 @@ function isUnrecoverableAuthError(error) {
   return namesAuthProblem || rejectedByStatus;
 }
 
+/** Unrecognised rate-limit fields whose values describe the account's billing. */
+const BILLING_FIELDS = new Set([
+  "canUserPurchaseCredits",
+  "hasChargeableSavedPaymentMethod",
+]);
+
 /** Alert text for a token the API no longer accepts. */
 const TOKEN_REJECTED_MESSAGE =
   "Token rejected - run `claude setup-token`, update claudepulse.env and recreate the container";
@@ -227,6 +233,8 @@ export class PulseScheduler {
           sessionId: result.message?.session_id,
           windowResetsAt: result.rateLimit?.fiveHourResetsAt?.toISOString(),
           weeklyUsage: result.rateLimit?.weekly?.utilization ?? undefined,
+          usingOverage:
+            result.rateLimit?.overage?.using === true ? true : undefined,
           timerDurationMs: duration?.ms,
         });
 
@@ -313,13 +321,22 @@ export class PulseScheduler {
     if (!fields) {
       return;
     }
-    const key = Object.keys(fields).sort().join(",");
+    const key = JSON.stringify(Object.keys(fields).sort());
     if (this.reportedFieldSets.has(key)) {
       return;
     }
     this.reportedFieldSets.add(key);
+
+    // The log line is meant to be pasted into an issue, so values that
+    // describe the account's billing are replaced.
+    const shown = Object.fromEntries(
+      Object.entries(fields).map(([name, value]) => [
+        name,
+        BILLING_FIELDS.has(name) ? "[omitted]" : value,
+      ]),
+    );
     this.logger.warn("ratelimit", "Unrecognised rate-limit fields", {
-      fields: JSON.stringify(fields),
+      fields: JSON.stringify(shown),
     });
   }
 

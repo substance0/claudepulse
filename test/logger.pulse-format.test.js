@@ -61,3 +61,11 @@ test("shows unrecognised rate-limit fields as plain JSON", () => {
 
   assert.equal(line, 'fields={"isUsingOverage":true}');
 });
+
+test("shows when extra usage is being drawn on", () => {
+  assert.match(formatPulse({ usingOverage: true }), /overage=on/);
+});
+
+test("says nothing about extra usage when it is not in use", () => {
+  assert.doesNotMatch(formatPulse({ usingOverage: undefined }), /overage/);
+});

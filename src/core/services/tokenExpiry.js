@@ -6,6 +6,7 @@
  */
 
 import { sendDiscordAlert } from "./notificationService.js";
+import { DateUtility } from "../utils/DateUtility.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -116,9 +117,10 @@ export function createTokenExpiryMonitor({
       if (!loggedThresholds.has(threshold)) {
         loggedThresholds.add(threshold);
         // Logged at warn even once expired: logger.error posts to the error
-        // webhook itself, which would duplicate the alert sent below.
-        logger.warn("token", warning.title, {
-          expiresAt: expiresAt.toISOString(),
+        // webhook itself, which would duplicate the alert sent below. The
+        // title is built without the label, which the logger already shows.
+        logger.warn("token", buildExpiryWarning(days, expiresAt).title, {
+          expiresAt: DateUtility.formatLocalIso(expiresAt),
           daysLeft: days,
         });
       }

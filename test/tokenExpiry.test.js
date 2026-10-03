@@ -8,6 +8,7 @@ import {
   dueThreshold,
   parseExpiryDate,
 } from "../src/core/services/tokenExpiry.js";
+import { DateUtility } from "../src/core/utils/DateUtility.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EXPIRY = new Date(2027, 8, 25); // 25 Sep 2027, local midnight
@@ -154,4 +155,30 @@ test("without a webhook, logs each warning once", async () => {
   await monitor.check();
 
   assert.deepEqual(warned, ["Claude token expires in 3 days"]);
+});
+
+test("logs the warning without the label the logger already shows, with the local date", async () => {
+  // Arrange
+  const logged = [];
+  const sent = [];
+  const monitor = createTokenExpiryMonitor({
+    expiresAt: EXPIRY,
+    webhookUrl: "https://discord.test/hook",
+    label: "work",
+    logger: { warn: (_c, message, data) => logged.push({ message, data }) },
+    send: async (payload) => {
+      sent.push(payload);
+      return true;
+    },
+    now: () => new Date(EXPIRY.getTime() - 3 * DAY_MS),
+  });
+
+  // Act
+  await monitor.check();
+
+  // Assert: the log line has no second label and reads in local time;
+  // Discord still names the account
+  assert.equal(logged[0].message, "Claude token expires in 3 days");
+  assert.equal(logged[0].data.expiresAt, DateUtility.formatLocalIso(EXPIRY));
+  assert.equal(sent[0].title, "work · Claude token expires in 3 days");
 });

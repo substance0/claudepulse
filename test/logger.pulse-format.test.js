@@ -55,3 +55,9 @@ test("names which limit refused the pulse", () => {
 
   assert.match(line, /limit=weekly/);
 });
+
+test("shows unrecognised rate-limit fields as plain JSON", () => {
+  const line = logger._formatDataForInline({ fields: '{"isUsingOverage":true}' }, "ratelimit");
+
+  assert.equal(line, 'fields={"isUsingOverage":true}');
+});

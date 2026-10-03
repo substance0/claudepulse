@@ -134,6 +134,8 @@ export class PulseScheduler {
     this.fixedIntervalMs = 5 * 60 * 60 * 1000; // 5 hours
     // Latest rate-limit state reported by a pulse; drives scheduling
     this.rateLimit = null;
+    // Names of unknown rate-limit field sets already logged
+    this.reportedFieldSets = new Set();
 
     this.schedulingManager = new SchedulingStrategyManager();
 
@@ -286,6 +288,7 @@ export class PulseScheduler {
     if (pulseResult.rateLimit) {
       this.rateLimit = pulseResult.rateLimit;
     }
+    this._reportUnrecognisedFields(pulseResult.rateLimit);
 
     if (pulseResult.success) {
       this.consecutiveFailures = 0;
@@ -297,6 +300,27 @@ export class PulseScheduler {
     // An exhausted allowance means Claude is in use, not that ClaudePulse is
     // broken, so callers do not count it as a failure.
     return { ...pulseResult, limitReached: isLimitReached(pulseResult) };
+  }
+
+  /**
+   * Log rate-limit fields ClaudePulse does not understand, once per distinct
+   * set of names. They show what a pulse reports in situations not yet
+   * handled, such as extra usage.
+   * @param {?{unrecognised: ?Object}} rateLimit
+   */
+  _reportUnrecognisedFields(rateLimit) {
+    const fields = rateLimit?.unrecognised;
+    if (!fields) {
+      return;
+    }
+    const key = Object.keys(fields).sort().join(",");
+    if (this.reportedFieldSets.has(key)) {
+      return;
+    }
+    this.reportedFieldSets.add(key);
+    this.logger.warn("ratelimit", "Unrecognised rate-limit fields", {
+      fields: JSON.stringify(fields),
+    });
   }
 
   /**

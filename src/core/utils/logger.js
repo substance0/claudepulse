@@ -226,6 +226,11 @@ export class Logger {
         }
         return "";
 
+      case "ratelimit":
+        // Already JSON; printed as-is so it can be copied into an issue
+        if (data.fields) return `fields=${data.fields}`;
+        return "";
+
       case "dry-run":
         if (data.optimalSchedule) {
           const optimal = DateUtility.formatLocalIso(

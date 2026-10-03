@@ -69,6 +69,33 @@ function setupProcessErrorHandlers(scheduler, config) {
 }
 
 /**
+ * Check the token expiry now and then hourly, when TOKEN_EXPIRES_AT is set.
+ * A failed check is logged and never stops the process.
+ * @param {Object} config - Application configuration
+ * @param {Object} logger - Logger instance
+ */
+async function startTokenExpiryMonitor(config, logger) {
+  if (!config.TOKEN_EXPIRES_AT) {
+    return;
+  }
+  const monitor = createTokenExpiryMonitor({
+    expiresAt: parseExpiryDate(config.TOKEN_EXPIRES_AT),
+    webhookUrl: config.DISCORD_WEBHOOK_URL,
+    label: config.ACCOUNT_LABEL,
+    logger,
+  });
+  const checkExpiry = () =>
+    monitor.check().catch((error) =>
+      logger.warn("token", "Token expiry check failed", {
+        error: error.message,
+      }),
+    );
+  await checkExpiry();
+  // Hourly is plenty for day-sized thresholds; unref lets shutdown proceed.
+  setInterval(checkExpiry, TOKEN_CHECK_INTERVAL_MS).unref();
+}
+
+/**
  * Initialize and start the ClaudePulse automation scheduler
  * @param {Object} config - Application configuration
  * @param {Object} logger - Logger instance
@@ -118,6 +145,10 @@ async function runScheduler(config, logger) {
     process.exit(0);
   }
 
+  // Before the first pulse, so an expired token is reported as such rather
+  // than only as a rejected pulse.
+  await startTokenExpiryMonitor(config, logger);
+
   // The Claude CLI authenticates each pulse itself, so there is no credential
   // state to wait on before starting. A credential that is absent or no longer
   // accepted surfaces as a failed pulse, which the scheduler reports without
@@ -151,24 +182,6 @@ async function runScheduler(config, logger) {
       "ClaudePulse automation running... Press Ctrl+C to stop",
     );
   } catch {}
-
-  if (config.TOKEN_EXPIRES_AT) {
-    const monitor = createTokenExpiryMonitor({
-      expiresAt: parseExpiryDate(config.TOKEN_EXPIRES_AT),
-      webhookUrl: config.DISCORD_WEBHOOK_URL,
-      label: config.ACCOUNT_LABEL,
-      logger,
-    });
-    const checkExpiry = () =>
-      monitor.check().catch((error) =>
-        logger.warn("token", "Token expiry check failed", {
-          error: error.message,
-        }),
-      );
-    await checkExpiry();
-    // Hourly is plenty for day-sized thresholds; unref lets shutdown proceed.
-    setInterval(checkExpiry, TOKEN_CHECK_INTERVAL_MS).unref();
-  }
 
   return { scheduler, heartbeatInterval: null };
 }

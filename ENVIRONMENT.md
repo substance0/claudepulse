@@ -523,10 +523,10 @@ because pulses are failing.
 
 ```bash
 # Which strategy scheduled the next pulse (window_reset is normal):
-docker logs claudepulse | grep -i "Strategy selected"
+docker logs claudepulse 2>&1 | grep -i "Strategy selected"
 
-# Whether pulses report a window reset:
-docker logs claudepulse | grep -i "windowResetsAt\|Pulse failed"
+# Whether pulses report a window reset (failures are warnings, on stderr):
+docker logs claudepulse 2>&1 | grep -i "windowResetsAt\|Pulse failed"
 ```
 
 ---
@@ -560,16 +560,30 @@ LOG_LEVEL=WARN      # Reduce verbosity
 
 ### Unrecognised Rate-Limit Fields
 
-**Symptoms:** `[WARN] [RATELIMIT] Unrecognised rate-limit fields (fields={…})` in the logs.
-**Meaning:** A pulse reported rate-limit data ClaudePulse does not use yet,
-for example about extra usage. Pulsing is unaffected. Each set of fields is
-logged once per container start.
+**Symptoms:** a `[WARN]` line with category `[RATELIMIT]` and the message
+`Unrecognised rate-limit fields (fields={…})` in the logs; with
+`ACCOUNT_LABEL` set, the label sits before the category.
+**Meaning:** A pulse reported rate-limit data ClaudePulse does not use yet.
+Pulsing is unaffected. Each distinct set of field names is logged once per
+container start. The extra-usage fields every pulse carries (`overageStatus`,
+`overageDisabledReason`, `isUsingOverage`, `overageResetsAt`) are read and do
+not trigger this line.
 
 ```bash
-docker logs claudepulse | grep -i "Unrecognised rate-limit fields"
+docker logs claudepulse 2>&1 | grep -i "Unrecognised rate-limit fields"
 ```
 
-Please open an issue with that line, so the next version can act on it.
+Warnings are written to stderr, so `2>&1` is needed for `grep` to see them.
+If you open an issue with that line, check it first: values describing your
+account's billing (`canUserPurchaseCredits`, `hasChargeableSavedPaymentMethod`)
+are replaced by `[omitted]`, but other values are printed as received.
+
+When a pulse is drawing on paid extra usage, its log line ends with
+`overage=on`:
+
+```bash
+docker logs claudepulse 2>&1 | grep "overage=on"
+```
 
 ---
 

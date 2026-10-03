@@ -128,16 +128,27 @@ Rules:
 
 ## 5. Unrecognised rate-limit fields (T48)
 
-No sample exists of what a pulse reports when extra usage (paid credits) is in
-play, so this step only gathers evidence.
+A real pulse (captured on an account without extra-usage credits) carries the
+extra-usage fields on every event: `overageStatus: "rejected"`,
+`overageDisabledReason: "out_of_credits"` and `isUsingOverage: false`. The
+Claude CLI can also send `overageResetsAt`, `overageInUse`, `limitScope`,
+`surpassedThreshold`, `rateLimitGraceActive`, `overagePeriodMonthly`,
+`overagePeriodChannel`, `errorCode`, `canUserPurchaseCredits` and
+`hasChargeableSavedPaymentMethod`.
 
-- The executor keeps `rateLimit.unrecognised`: the `rate_limit_info` fields
-  other than `status`, `resetsAt`, `utilization`, `rateLimitType`,
-  `unifiedWindows`, with their values.
+- The executor reads `overageStatus`, `overageDisabledReason`,
+  `isUsingOverage` and `overageResetsAt` into `rateLimit.overage`
+  (`{status, disabledReason, using, resetsAt}`, null when absent). A pulse
+  drawing on extra usage logs `overage=on`.
+- The executor keeps every other field outside `status`, `resetsAt`,
+  `utilization`, `rateLimitType`, `unifiedWindows` and those four as
+  `rateLimit.unrecognised`, with its value.
 - The scheduler logs them at WARN once per distinct set of field names, as
-  "Unrecognised rate-limit fields".
-- A follow-up design decides whether to skip pulses while extra usage is
-  active, from the fields this surfaces.
+  "Unrecognised rate-limit fields". Values of the two billing flags
+  (`canUserPurchaseCredits`, `hasChargeableSavedPaymentMethod`) are replaced
+  by `[omitted]`, since operators paste the line into issues.
+- Acting on extra usage, such as skipping pulses while it is in use, is a
+  follow-up design (T56).
 
 ## 6. Persisted schedule (T53, Q27 a)
 

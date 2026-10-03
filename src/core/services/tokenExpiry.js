@@ -33,13 +33,17 @@ export function parseExpiryDate(text) {
 }
 
 /**
- * Whole days left before expiry; a partial day counts as a full one.
- * @param {Date} expiresAt
+ * Whole days left before expiry, counted in local calendar days so a clock
+ * change does not shift a warning by an hour; the rest of today counts as a
+ * full day.
+ * @param {Date} expiresAt - Local midnight at the start of the expiry day
  * @param {Date} now
  * @returns {number} 0 or less once expired
  */
 export function daysLeft(expiresAt, now) {
-  return Math.ceil((expiresAt.getTime() - now.getTime()) / DAY_MS);
+  const calendarDay = (date) =>
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((calendarDay(expiresAt) - calendarDay(now)) / DAY_MS);
 }
 
 /**

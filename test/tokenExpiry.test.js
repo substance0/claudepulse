@@ -10,6 +10,9 @@ import {
 } from "../src/core/services/tokenExpiry.js";
 import { DateUtility } from "../src/core/utils/DateUtility.js";
 
+// Europe/Paris changes clocks on 29 Mar and 25 Oct 2026.
+process.env.TZ = "Europe/Paris";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EXPIRY = new Date(2027, 8, 25); // 25 Sep 2027, local midnight
 
@@ -181,4 +184,14 @@ test("logs the warning without the label the logger already shows, with the loca
   assert.equal(logged[0].message, "Claude token expires in 3 days");
   assert.equal(logged[0].data.expiresAt, DateUtility.formatLocalIso(EXPIRY));
   assert.equal(sent[0].title, "work · Claude token expires in 3 days");
+});
+
+test("counts calendar days across the autumn clock change", () => {
+  // Sun 25 Oct (the clocks go back) to Sun 1 Nov is 7 days, not 7 days + 1 h
+  assert.equal(daysLeft(new Date(2026, 10, 1), new Date(2026, 9, 25, 0, 0)), 7);
+});
+
+test("counts calendar days across the spring clock change", () => {
+  // Sat 28 Mar 23:30 to Sun 5 Apr is still 8 days, not 6 days 23.5 h
+  assert.equal(daysLeft(new Date(2026, 3, 5), new Date(2026, 2, 28, 23, 30)), 8);
 });

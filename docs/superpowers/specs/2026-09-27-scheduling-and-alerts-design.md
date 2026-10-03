@@ -115,12 +115,14 @@ Rules:
 ## 4. Token expiry warnings (T47, Q26 a)
 
 - New optional setting `TOKEN_EXPIRES_AT` (`YYYY-MM-DD`, local midnight).
-- A token monitor checks at startup and then hourly. It sends one Discord
-  alert per threshold crossed: 14, 7 and 1 day(s) left, and 0 (expired).
-  Days left = ceiling of (expiry − now) / 24 h.
+- A token monitor checks at startup, before the scheduler starts, and then
+  hourly. It delivers one Discord alert per threshold crossed: 14, 7 and 1
+  day(s) left, and 0 (expired). Days left = local calendar days from today to
+  the expiry date, so clock changes do not shift a warning.
 - Alerts go to `DISCORD_WEBHOOK_URL` (level WARN; ERROR once expired) and to
-  the log; without a webhook, the log only. Sent thresholds are kept in
-  memory, so a restart re-sends the current threshold once.
+  the log; without a webhook, the log only. An alert Discord did not accept
+  is retried at the next check; each is logged once. Delivered thresholds are
+  kept in memory, so a restart re-sends the current threshold once.
 - An authentication rejection names the fix: "Token rejected - run
   `claude setup-token`, update claudepulse.env and recreate the container".
 

@@ -558,6 +558,21 @@ LOG_LEVEL=WARN      # Reduce verbosity
 
 ---
 
+### Unrecognised Rate-Limit Fields
+
+**Symptoms:** `[WARN] [RATELIMIT] Unrecognised rate-limit fields (fields={…})` in the logs.
+**Meaning:** A pulse reported rate-limit data ClaudePulse does not use yet,
+for example about extra usage. Pulsing is unaffected. Each set of fields is
+logged once per container start.
+
+```bash
+docker logs claudepulse | grep -i "Unrecognised rate-limit fields"
+```
+
+Please open an issue with that line, so the next version can act on it.
+
+---
+
 ## Configuration Best Practices
 
 ### 1. Minimal Token Usage

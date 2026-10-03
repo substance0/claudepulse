@@ -74,7 +74,7 @@ function parseEnvironmentVariables() {
     DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
     // Trimmed: a stray space in an env file would otherwise show in every label
     ACCOUNT_LABEL: process.env.ACCOUNT_LABEL?.trim() || undefined,
-    TOKEN_EXPIRES_AT: process.env.TOKEN_EXPIRES_AT || undefined,
+    TOKEN_EXPIRES_AT: process.env.TOKEN_EXPIRES_AT?.trim() || undefined,
     WORK_HOURS_ENABLED: process.env.WORK_HOURS_ENABLED,
     WORK_START: process.env.WORK_START || undefined,
     WORK_END: process.env.WORK_END || undefined,

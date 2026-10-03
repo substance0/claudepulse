@@ -228,3 +228,14 @@ test("rejects a token expiry that is not a real date", async () => {
 
   assert.throws(() => validateConfig(config), /TOKEN_EXPIRES_AT must be a date as YYYY-MM-DD/);
 });
+
+test("trims spaces around the token expiry date", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.TOKEN_EXPIRES_AT = " 2027-09-25 ";
+
+  try {
+    assert.equal(loadConfig().TOKEN_EXPIRES_AT, "2027-09-25");
+  } finally {
+    delete process.env.TOKEN_EXPIRES_AT;
+  }
+});

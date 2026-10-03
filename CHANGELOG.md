@@ -1,3 +1,21 @@
+# [2.4.0](https://github.com/substance0/claudepulse/compare/v2.3.0...v2.4.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* check the token expiry before the first pulse ([6773851](https://github.com/substance0/claudepulse/commit/6773851dd987103c463dfae0e2e4cfe1a66dee0a))
+* count token expiry days in calendar days ([b114ce0](https://github.com/substance0/claudepulse/commit/b114ce0b652e16803b0656961e9d6e48a06feb19))
+* log token warnings once labelled and with the local expiry date ([b63ea7f](https://github.com/substance0/claudepulse/commit/b63ea7fa77347933659a37e32802a4736b5ea7d6))
+* retry a token expiry warning Discord did not accept ([1444845](https://github.com/substance0/claudepulse/commit/1444845c13f22eb4f2321dde923d259fd7c4e395))
+* trim spaces around TOKEN_EXPIRES_AT ([8da7430](https://github.com/substance0/claudepulse/commit/8da7430187b886bb76f539b97ea317b2fa3c1762))
+
+
+### Features
+
+* compute token expiry warnings ([5cbba07](https://github.com/substance0/claudepulse/commit/5cbba0714032fea09cc0ec0f6726d2fa054fe22f))
+* tell the operator how to renew a rejected token ([185530b](https://github.com/substance0/claudepulse/commit/185530b8f1b079ac919c14abdea6bf7d6d447483))
+* warn before the Claude token expires ([d750c9b](https://github.com/substance0/claudepulse/commit/d750c9ba9255908fa6e47eee7d00351f97d16b96))
+
 # [2.3.0](https://github.com/substance0/claudepulse/compare/v2.2.0...v2.3.0) (2026-09-28)
 
 

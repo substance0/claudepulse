@@ -163,7 +163,7 @@ test("without a state store, behaves exactly as before", async () => {
   assert.notEqual(record.scheduled.at(-1).strategy, "restored");
 });
 
-test("a dry run neither reads nor writes the state", async () => {
+test("a dry run reads the state but never writes it", async () => {
   const calls = [];
   const store = {
     load: async () => {
@@ -179,7 +179,53 @@ test("a dry run neither reads nor writes the state", async () => {
 
   await scheduler.start();
 
-  assert.deepEqual(calls, []);
+  assert.deepEqual(calls, ["load"]);
+});
+
+/** Run a dry run and return the data of its "Scheduling Analysis" line. */
+async function dryRunAnalysis(options) {
+  const { scheduler, record } = buildScheduler(options);
+  const analyses = [];
+  scheduler.logger.info = (_category, message, data) => {
+    if (message === "Scheduling Analysis") analyses.push(data);
+  };
+  scheduler.config.dryRun = true;
+
+  await scheduler.start();
+
+  return { analysis: analyses[0], record };
+}
+
+test("a dry run reports the saved schedule a real start would resume", async () => {
+  const saved = savedState({ nextPulseAt: new Date(Date.now() + 2 * HOUR_MS) });
+  const store = memoryStore(saved);
+
+  const { analysis, record } = await dryRunAnalysis({ stateStore: store });
+
+  assert.equal(analysis.optimalSchedule, saved.nextPulseAt.toISOString());
+  assert.equal(analysis.resumedFromState, true);
+  assert.equal(store.saved, null);
+  assert.equal(record.attempts, 0);
+});
+
+test("a dry run reports the computed schedule when the saved one would not be resumed", async () => {
+  const saved = savedState({ fingerprint: "other-settings" });
+
+  const { analysis } = await dryRunAnalysis({ stateStore: memoryStore(saved) });
+
+  assert.equal(analysis.resumedFromState, false);
+  assert.notEqual(analysis.optimalSchedule, saved.nextPulseAt.toISOString());
+});
+
+test("a dry run reports the working day when the saved time is outside work hours", async () => {
+  const nextMorning = new Date(Date.now() + 10 * HOUR_MS);
+
+  const { analysis } = await dryRunAnalysis({
+    stateStore: memoryStore(savedState({ nextPulseAt: new Date(Date.now() + 2 * HOUR_MS) })),
+    workHours: { nextAllowed: () => nextMorning, isActive: () => true },
+  });
+
+  assert.equal(analysis.optimalSchedule, nextMorning.toISOString());
 });
 
 /** A saved state as the store loads it, matching the scheduler's settings. */

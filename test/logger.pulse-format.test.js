@@ -69,3 +69,13 @@ test("shows when extra usage is being drawn on", () => {
 test("says nothing about extra usage when it is not in use", () => {
   assert.doesNotMatch(formatPulse({ usingOverage: undefined }), /overage/);
 });
+
+test("says when a dry run's schedule is resumed from a saved one", () => {
+  const line = logger._formatDataForInline(
+    { optimalSchedule: "2026-10-05T09:00:10.000Z", resumedFromState: true },
+    "dry-run",
+  );
+
+  assert.match(line, /scheduled_for=/);
+  assert.match(line, /resumed from saved schedule/);
+});

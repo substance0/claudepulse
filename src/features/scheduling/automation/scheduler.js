@@ -332,13 +332,32 @@ export class PulseScheduler {
   async _restoreState() {
     // A time left over from an earlier start is never carried forward.
     this.restoredNextPulseAt = null;
-    if (!this.stateStore) {
+    const saved = await this._loadResumableState();
+    if (!saved) {
       return false;
+    }
+    this.rateLimit = saved.rateLimit;
+    this.restoredNextPulseAt = saved.nextPulseAt;
+    this.logger.info("startup", "Resuming saved schedule", {
+      planned: saved.nextPulseAt.toISOString(),
+    });
+    return true;
+  }
+
+  /**
+   * The saved schedule a start would resume, or null. It only reads, so a
+   * dry run can report what a real start would do; every reason for not
+   * resuming a saved schedule is logged.
+   * @returns {Promise<{nextPulseAt: Date, rateLimit: Object|null}|null>}
+   */
+  async _loadResumableState() {
+    if (!this.stateStore) {
+      return null;
     }
     try {
       const saved = await this.stateStore.load();
       if (!saved || saved.nextPulseAt <= new Date()) {
-        return false;
+        return null;
       }
       // The furthest a real schedule reaches is a weekly limit lifting plus a
       // few days off; beyond that the file was edited or the clock was wrong.
@@ -348,7 +367,7 @@ export class PulseScheduler {
           "Ignoring the saved schedule: its pulse time is too far ahead",
           { planned: saved.nextPulseAt.toISOString() },
         );
-        return false;
+        return null;
       }
       // A schedule computed under other settings could only delay a pulse the
       // new settings want sooner.
@@ -357,7 +376,7 @@ export class PulseScheduler {
           "startup",
           "Ignoring the saved schedule: settings changed since it was saved",
         );
-        return false;
+        return null;
       }
       // Without a known window the saved time is the next hour, a guess: a
       // restart, for example with a fixed token, should pulse to learn it.
@@ -366,19 +385,14 @@ export class PulseScheduler {
           "startup",
           "Ignoring the saved schedule: it was a guess made before any window was known",
         );
-        return false;
+        return null;
       }
-      this.rateLimit = saved.rateLimit;
-      this.restoredNextPulseAt = saved.nextPulseAt;
-      this.logger.info("startup", "Resuming saved schedule", {
-        planned: saved.nextPulseAt.toISOString(),
-      });
-      return true;
+      return saved;
     } catch (error) {
       this.logger.warn("startup", "Ignoring unreadable state", {
         error: error.message,
       });
-      return false;
+      return null;
     }
   }
 
@@ -677,10 +691,14 @@ export class PulseScheduler {
   async dryRunAnalysis() {
     this.logger.info("dry-run", "=== DRY RUN MODE - ANALYSIS ONLY ===");
 
-    // Without a real pulse no window is known, so the first pulse would
-    // follow the configured start hour or the next hour.
+    // A real start resumes a resumable saved schedule. Without one, no window
+    // is known, so the first pulse would follow the configured start hour or
+    // the next hour.
+    const saved = await this._loadResumableState();
     const firstPulse =
-      this._nextFromInitialPulseHourPlusTen() ?? this._nextHourPlusTen();
+      saved?.nextPulseAt ??
+      this._nextFromInitialPulseHourPlusTen() ??
+      this._nextHourPlusTen();
     const optimalNextRun = this.workHours
       ? this.workHours.nextAllowed(firstPulse)
       : firstPulse;
@@ -688,6 +706,7 @@ export class PulseScheduler {
 
     this.logger.info("dry-run", "Scheduling Analysis", {
       optimalSchedule: optimalNextRun.toISOString(),
+      resumedFromState: Boolean(saved),
       intervalHours: this.config.intervalHours,
       intervalMs,
       timeUntilRun: `${Math.floor(intervalMs / (60 * 60 * 1000))}h ${Math.floor((intervalMs % (60 * 60 * 1000)) / (60 * 1000))}m`,

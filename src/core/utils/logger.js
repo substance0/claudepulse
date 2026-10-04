@@ -237,7 +237,9 @@ export class Logger {
           const optimal = DateUtility.formatLocalIso(
             new Date(data.optimalSchedule),
           );
-          return `scheduled_for=${optimal}`;
+          return data.resumedFromState
+            ? `scheduled_for=${optimal}, resumed from saved schedule`
+            : `scheduled_for=${optimal}`;
         }
         return "";
 

@@ -104,6 +104,7 @@ export class PulseScheduler {
    * @param {Object} options.config - Configuration object
    * @param {{notify: Function}} [options.notifier] - Announces each pulse's window
    * @param {{nextAllowed: Function, isActive: Function}} [options.workHours] - Limits pulses to working hours
+   * @param {{load: Function, save: Function}} [options.stateStore] - Persists the schedule across restarts
    */
   constructor(options = {}) {
     // Validate required dependencies
@@ -121,6 +122,9 @@ export class PulseScheduler {
     this.executor = options.executor;
     this.notifier = options.notifier;
     this.workHours = options.workHours ?? null;
+    this.stateStore = options.stateStore ?? null;
+    // A saved pulse time to resume at startup, used once
+    this.restoredNextPulseAt = null;
     this.logger = options.logger.child({
       component: "scheduler",
       intervalHours: options.config.intervalHours || 5,
@@ -311,6 +315,50 @@ export class PulseScheduler {
   }
 
   /**
+   * Resume a saved schedule whose next pulse is still ahead.
+   * @returns {Promise<boolean>} Whether a schedule was restored
+   */
+  async _restoreState() {
+    if (!this.stateStore) {
+      return false;
+    }
+    try {
+      const saved = await this.stateStore.load();
+      if (!saved || saved.nextPulseAt <= new Date()) {
+        return false;
+      }
+      this.rateLimit = saved.rateLimit;
+      this.restoredNextPulseAt = saved.nextPulseAt;
+      this.logger.info("startup", "Resuming saved schedule", {
+        planned: saved.nextPulseAt.toISOString(),
+      });
+      return true;
+    } catch (error) {
+      this.logger.warn("startup", "Ignoring unreadable state", {
+        error: error.message,
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Save the next planned pulse; a failure is logged and never stops pulsing.
+   * @param {Date} nextPulseAt
+   */
+  async _saveState(nextPulseAt) {
+    if (!this.stateStore) {
+      return;
+    }
+    try {
+      await this.stateStore.save({ nextPulseAt, rateLimit: this.rateLimit });
+    } catch (error) {
+      this.logger.warn("schedule", "Could not save state", {
+        error: error.message,
+      });
+    }
+  }
+
+  /**
    * Log rate-limit fields ClaudePulse does not understand, once per distinct
    * set of names. They show what a pulse reports in situations not yet
    * handled, such as extra usage.
@@ -497,9 +545,18 @@ export class PulseScheduler {
       nextHourPlusTen: () => this._nextHourPlusTen(),
     };
 
-    // Use strategy manager to compute next run time
-    let { time: planned, strategy } =
-      await this.schedulingManager.computeNextRunTime(context);
+    // A schedule restored at startup is used once; every later pulse follows
+    // the strategies.
+    let planned;
+    let strategy;
+    if (this.restoredNextPulseAt) {
+      planned = this.restoredNextPulseAt;
+      strategy = "restored";
+      this.restoredNextPulseAt = null;
+    } else {
+      ({ time: planned, strategy } =
+        await this.schedulingManager.computeNextRunTime(context));
+    }
 
     // Strategies return future times; roll forward defensively if one did not
     let finalTime = planned;
@@ -520,6 +577,7 @@ export class PulseScheduler {
       }
     }
     this.lastScheduledTime = finalTime;
+    await this._saveState(finalTime);
 
     // Log scheduling result
     const intervalMs = finalTime.getTime() - now.getTime();
@@ -593,10 +651,14 @@ export class PulseScheduler {
       intervalHours: this.config.intervalHours,
     });
 
+    // A saved schedule replaces the startup pulse: the window it was planned
+    // from is still the one running.
+    const restored = await this._restoreState();
+
     // The first pulse reports the current window, which every later pulse is
     // scheduled from. Outside working hours it would open a window nobody
     // uses, so the working day's first pulse is left to the schedule.
-    if (this.config.immediatePulseAfterAuth) {
+    if (!restored && this.config.immediatePulseAfterAuth) {
       const now = new Date();
       if (this.workHours && !this.workHours.isActive(now)) {
         const firstPulse = this.workHours.nextAllowed(now);

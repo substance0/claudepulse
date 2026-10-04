@@ -9,7 +9,10 @@ import {
 } from "./core/config/index.js";
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
 import { createWindowNotifier } from "./core/services/windowNotification.js";
-import { createStateStore } from "./core/services/stateStore.js";
+import {
+  createStateStore,
+  scheduleFingerprint,
+} from "./core/services/stateStore.js";
 import {
   createTokenExpiryMonitor,
   parseExpiryDate,
@@ -136,6 +139,7 @@ async function runScheduler(config, logger) {
     notifier,
     workHours: createWorkHoursFromConfig(config),
     stateStore: config.STATE_DIR ? createStateStore(config.STATE_DIR) : undefined,
+    stateFingerprint: scheduleFingerprint(config),
   });
 
   // === End Composition Root ===

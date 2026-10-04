@@ -14,7 +14,7 @@ function allowedPulse(windowReset) {
   };
 }
 
-function buildScheduler({ stateStore, workHours }) {
+function buildScheduler({ stateStore, workHours, stateFingerprint = "fp" }) {
   const record = { attempts: 0, scheduled: [], warnings: [] };
   const logger = {
     info() {},
@@ -40,6 +40,7 @@ function buildScheduler({ stateStore, workHours }) {
     logger,
     config: { PROMPT_TEXT: "pulse check", MAX_RETRIES: 3 },
     stateStore,
+    stateFingerprint,
     workHours,
   });
   return { scheduler, record };
@@ -81,7 +82,7 @@ test("resumes a saved future pulse instead of pulsing at startup", async () => {
   const nextPulseAt = new Date(Date.now() + 2 * HOUR_MS);
   const rateLimit = { status: "allowed", resetsAt: nextPulseAt, fiveHourResetsAt: nextPulseAt };
   const { scheduler, record } = buildScheduler({
-    stateStore: memoryStore({ nextPulseAt, rateLimit }),
+    stateStore: memoryStore(savedState({ nextPulseAt, rateLimit })),
   });
 
   // Act
@@ -96,7 +97,7 @@ test("resumes a saved future pulse instead of pulsing at startup", async () => {
 
 test("ignores a saved pulse that is already past", async () => {
   const { scheduler, record } = buildScheduler({
-    stateStore: memoryStore({ nextPulseAt: new Date(Date.now() - HOUR_MS), rateLimit: null }),
+    stateStore: memoryStore(savedState({ nextPulseAt: new Date(Date.now() - HOUR_MS) })),
   });
 
   await startAndStop(scheduler);
@@ -141,7 +142,7 @@ test("a restored pulse outside work hours waits for the working day", async () =
   // startup pulse is sent; the restored time itself is still outside them
   const nextMorning = new Date(Date.now() + 10 * HOUR_MS);
   const { scheduler, record } = buildScheduler({
-    stateStore: memoryStore({ nextPulseAt: new Date(Date.now() + 2 * HOUR_MS), rateLimit: null }),
+    stateStore: memoryStore(savedState({ nextPulseAt: new Date(Date.now() + 2 * HOUR_MS) })),
     workHours: { nextAllowed: () => nextMorning, isActive: () => true },
   });
 
@@ -178,4 +179,84 @@ test("a dry run neither reads nor writes the state", async () => {
   await scheduler.start();
 
   assert.deepEqual(calls, []);
+});
+
+/** A saved state as the store loads it, matching the scheduler's settings. */
+function savedState(overrides = {}) {
+  return {
+    nextPulseAt: new Date(Date.now() + 2 * HOUR_MS),
+    rateLimit: null,
+    strategy: "window_reset",
+    fingerprint: "fp",
+    ...overrides,
+  };
+}
+
+test("saves the strategy and settings fingerprint with the schedule", async () => {
+  const store = memoryStore(null);
+  const { scheduler } = buildScheduler({ stateStore: store, stateFingerprint: "fp-now" });
+
+  await startAndStop(scheduler);
+
+  assert.equal(store.saved.fingerprint, "fp-now");
+  assert.equal(typeof store.saved.strategy, "string");
+});
+
+test("saves the strategy the time was based on, not the work-hours move", async () => {
+  const store = memoryStore(null);
+  const { scheduler, record } = buildScheduler({
+    stateStore: store,
+    workHours: { nextAllowed: () => new Date(Date.now() + 20 * HOUR_MS), isActive: () => true },
+  });
+
+  await startAndStop(scheduler);
+
+  assert.equal(record.scheduled.at(-1).strategy, "work_hours");
+  assert.equal(store.saved.strategy, "window_reset");
+});
+
+test("ignores a schedule saved under other settings", async () => {
+  // Turning work hours off must not leave the old, later pulse in place
+  const { scheduler, record } = buildScheduler({
+    stateStore: memoryStore(savedState({ fingerprint: "other-settings" })),
+  });
+
+  await startAndStop(scheduler);
+
+  assert.equal(record.attempts, 1);
+  assert.notEqual(record.scheduled.at(-1).strategy, "restored");
+});
+
+test("ignores a schedule saved without a fingerprint", async () => {
+  const { scheduler, record } = buildScheduler({
+    stateStore: memoryStore(savedState({ fingerprint: null })),
+  });
+
+  await startAndStop(scheduler);
+
+  assert.equal(record.attempts, 1);
+});
+
+test("ignores a saved schedule that was only a guess", async () => {
+  // After a failed cycle no window is known and the next hour is a guess;
+  // a restart with a fixed token must pulse to learn the window
+  const { scheduler, record } = buildScheduler({
+    stateStore: memoryStore(savedState({ strategy: "discovery" })),
+  });
+
+  await startAndStop(scheduler);
+
+  assert.equal(record.attempts, 1);
+});
+
+test("says why a saved schedule is not resumed", async () => {
+  const infos = [];
+  const { scheduler } = buildScheduler({
+    stateStore: memoryStore(savedState({ fingerprint: "other-settings" })),
+  });
+  scheduler.logger.info = (_category, message) => infos.push(message);
+
+  await startAndStop(scheduler);
+
+  assert.ok(infos.some((m) => /settings changed/i.test(m)), infos.join("\n"));
 });

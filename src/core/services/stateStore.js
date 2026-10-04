@@ -60,6 +60,27 @@ function reviveRateLimit(data) {
 }
 
 /**
+ * Identify the settings that decide when pulses are planned. A saved schedule
+ * computed under other settings is not resumed: it could only delay a pulse
+ * the new settings want sooner.
+ * @param {Object} config - Loaded configuration
+ * @returns {string}
+ */
+export function scheduleFingerprint(config) {
+  return JSON.stringify({
+    workHours: config.WORK_HOURS_ENABLED === true,
+    workStart: config.WORK_START ?? null,
+    workEnd: config.WORK_END ?? null,
+    workDays: config.WORK_DAYS ?? null,
+    hoursLeft: config.HOURS_LEFT_AT_START ?? null,
+    scheduledStartHour: config.SCHEDULED_START_HOUR ?? null,
+    immediatePulse: config.IMMEDIATE_PULSE_AFTER_AUTH !== false,
+    label: config.ACCOUNT_LABEL ?? null,
+    timeZone: process.env.TZ ?? null,
+  });
+}
+
+/**
  * Create a store for the state file in dir.
  * @param {string} dir - Directory holding state.json
  * @returns {{load: Function, save: Function}}
@@ -69,7 +90,7 @@ export function createStateStore(dir) {
 
   return {
     /**
-     * @returns {Promise<{nextPulseAt: Date, rateLimit: Object|null}|null>}
+     * @returns {Promise<{nextPulseAt: Date, rateLimit: Object|null, strategy: string|null, fingerprint: string|null}|null>}
      *   Null when nothing was saved yet
      * @throws {Error} When the file cannot be read or understood
      */
@@ -90,14 +111,22 @@ export function createStateStore(dir) {
       if (!nextPulseAt) {
         throw new Error("State has no valid nextPulseAt");
       }
-      return { nextPulseAt, rateLimit: reviveRateLimit(data.rateLimit) };
+      return {
+        nextPulseAt,
+        rateLimit: reviveRateLimit(data.rateLimit),
+        strategy: typeof data.strategy === "string" ? data.strategy : null,
+        fingerprint:
+          typeof data.fingerprint === "string" ? data.fingerprint : null,
+      };
     },
 
     /**
      * Write the state atomically: a crash mid-write leaves the previous file.
-     * @param {{nextPulseAt: Date, rateLimit: Object|null}} state
+     * @param {{nextPulseAt: Date, rateLimit: Object|null, strategy?: string, fingerprint?: string}} state
+     *   strategy names what the pulse time was based on; fingerprint
+     *   identifies the settings it was computed under
      */
-    async save({ nextPulseAt, rateLimit }) {
+    async save({ nextPulseAt, rateLimit, strategy, fingerprint }) {
       await fs.mkdir(dir, { recursive: true });
       // A name of its own per save, so concurrent saves into one directory
       // never write or rename the same temporary file.
@@ -106,6 +135,8 @@ export function createStateStore(dir) {
         version: STATE_VERSION,
         nextPulseAt: toIso(nextPulseAt),
         rateLimit: serialiseRateLimit(rateLimit),
+        strategy: strategy ?? null,
+        fingerprint: fingerprint ?? null,
         savedAt: new Date().toISOString(),
       };
       try {

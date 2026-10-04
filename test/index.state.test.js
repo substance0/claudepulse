@@ -7,15 +7,19 @@ import path from "node:path";
 import { DateUtility } from "../src/core/utils/DateUtility.js";
 import { runUntilStopped } from "./helpers/runApp.js";
 
-test("a restart resumes the schedule saved by the previous run", async (t) => {
-  // Arrange: a state directory both runs share, and a first pulse about 12
-  // hours away so neither run sends one
+async function tempDir(t) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "claudepulse-state-"));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
-  const env = {
-    STATE_DIR: dir,
-    SCHEDULED_START_HOUR: String((new Date().getHours() + 12) % 24),
-  };
+  return dir;
+}
+
+/** A first-pulse hour about 12 hours away, so no run sends a pulse. */
+const hoursAhead = (hours) => String((new Date().getHours() + hours) % 24);
+
+test("a restart resumes the schedule saved by the previous run", async (t) => {
+  // Arrange: a state directory both runs share
+  const dir = await tempDir(t);
+  const env = { STATE_DIR: dir, SCHEDULED_START_HOUR: hoursAhead(12) };
 
   // Act
   const first = await runUntilStopped(env);
@@ -32,11 +36,24 @@ test("a restart resumes the schedule saved by the previous run", async (t) => {
   assert.ok(second.includes(`next_run=${resumed}`), second);
 });
 
-test("without STATE_DIR no state file is written", async (t) => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "claudepulse-state-"));
-  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+test("a restart under changed settings does not resume the saved schedule", async (t) => {
+  const dir = await tempDir(t);
 
-  await runUntilStopped({});
+  await runUntilStopped({ STATE_DIR: dir, SCHEDULED_START_HOUR: hoursAhead(12) });
+  const second = await runUntilStopped({ STATE_DIR: dir, SCHEDULED_START_HOUR: hoursAhead(6) });
 
-  assert.deepEqual(await fs.readdir(dir), []);
+  assert.match(second, /settings changed/i);
+  assert.doesNotMatch(second, /Resuming saved schedule/);
+  assert.match(second, /strategy=scheduled_start/);
+});
+
+test("without STATE_DIR no state file is written anywhere the app could reach", async (t) => {
+  // The app runs with its working, temporary and home directories all inside
+  // one directory, which is searched afterwards
+  const dir = await tempDir(t);
+
+  await runUntilStopped({ TMPDIR: dir, HOME: dir }, { cwd: dir });
+
+  const files = await fs.readdir(dir, { recursive: true });
+  assert.deepEqual(files.filter((name) => name.endsWith("state.json")), []);
 });

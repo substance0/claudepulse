@@ -105,6 +105,7 @@ export class PulseScheduler {
    * @param {{notify: Function}} [options.notifier] - Announces each pulse's window
    * @param {{nextAllowed: Function, isActive: Function}} [options.workHours] - Limits pulses to working hours
    * @param {{load: Function, save: Function}} [options.stateStore] - Persists the schedule across restarts
+   * @param {string} [options.stateFingerprint] - Identifies the scheduling settings; a saved schedule made under other settings is not resumed
    */
   constructor(options = {}) {
     // Validate required dependencies
@@ -123,6 +124,7 @@ export class PulseScheduler {
     this.notifier = options.notifier;
     this.workHours = options.workHours ?? null;
     this.stateStore = options.stateStore ?? null;
+    this.stateFingerprint = options.stateFingerprint ?? "";
     // A saved pulse time to resume at startup, used once
     this.restoredNextPulseAt = null;
     this.logger = options.logger.child({
@@ -327,6 +329,24 @@ export class PulseScheduler {
       if (!saved || saved.nextPulseAt <= new Date()) {
         return false;
       }
+      // A schedule computed under other settings could only delay a pulse the
+      // new settings want sooner.
+      if (saved.fingerprint !== this.stateFingerprint) {
+        this.logger.info(
+          "startup",
+          "Ignoring the saved schedule: settings changed since it was saved",
+        );
+        return false;
+      }
+      // Without a known window the saved time is the next hour, a guess: a
+      // restart, for example with a fixed token, should pulse to learn it.
+      if (saved.strategy === "discovery") {
+        this.logger.info(
+          "startup",
+          "Ignoring the saved schedule: it was a guess made before any window was known",
+        );
+        return false;
+      }
       this.rateLimit = saved.rateLimit;
       this.restoredNextPulseAt = saved.nextPulseAt;
       this.logger.info("startup", "Resuming saved schedule", {
@@ -344,13 +364,19 @@ export class PulseScheduler {
   /**
    * Save the next planned pulse; a failure is logged and never stops pulsing.
    * @param {Date} nextPulseAt
+   * @param {string} strategy - What the time is based on
    */
-  async _saveState(nextPulseAt) {
+  async _saveState(nextPulseAt, strategy) {
     if (!this.stateStore) {
       return;
     }
     try {
-      await this.stateStore.save({ nextPulseAt, rateLimit: this.rateLimit });
+      await this.stateStore.save({
+        nextPulseAt,
+        rateLimit: this.rateLimit,
+        strategy,
+        fingerprint: this.stateFingerprint,
+      });
     } catch (error) {
       this.logger.warn("schedule", "Could not save state", {
         error: error.message,
@@ -558,6 +584,10 @@ export class PulseScheduler {
         await this.schedulingManager.computeNextRunTime(context));
     }
 
+    // What the time is based on, before work hours move it: a restart
+    // resumes it only when it was based on a known window.
+    const basis = strategy;
+
     // Strategies return future times; roll forward defensively if one did not
     let finalTime = planned;
     while (finalTime <= now) {
@@ -577,7 +607,7 @@ export class PulseScheduler {
       }
     }
     this.lastScheduledTime = finalTime;
-    await this._saveState(finalTime);
+    await this._saveState(finalTime, basis);
 
     // Log scheduling result
     const intervalMs = finalTime.getTime() - now.getTime();

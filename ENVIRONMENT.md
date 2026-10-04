@@ -263,6 +263,9 @@ LOG_LEVEL=DEBUG    # Development/troubleshooting
 - Logs what would happen
 - Exits without sending messages
 - Useful for testing configuration
+- With `STATE_DIR` set, reads the saved schedule and reports the one a real
+  start would resume (`resumed from saved schedule`); it never writes the
+  state
 
 **Example:**
 
@@ -324,7 +327,9 @@ startup.
 ClaudePulse writes `state.json` there after every scheduling decision. At
 startup, a saved pulse time is resumed, without a startup pulse, only when:
 
-- it is still ahead;
+- it is still ahead, and at most 15 days ahead: a real schedule reaches about
+  two weeks at most (a weekly limit lifting plus days off), so a time further
+  out, from a hand edit or a clock that was wrong, is ignored with a warning;
 - the scheduling settings are unchanged since it was saved: `WORK_HOURS_ENABLED`
   and the other work-hours settings, `SCHEDULED_START_HOUR`,
   `IMMEDIATE_PULSE_AFTER_AUTH`, `ACCOUNT_LABEL` and `TZ`. A changed setting

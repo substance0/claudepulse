@@ -164,10 +164,15 @@ Claude CLI can also send `overageResetsAt`, `overageInUse`, `limitScope`,
   not saved.
 - At startup, a saved `nextPulseAt` replaces the startup pulse, with the
   rate-limit state restored and the strategy named `restored` (then the
-  work-hours constraint), only when it is still in the future, its
+  work-hours constraint), only when it is still in the future and at most 15
+  days ahead (a weekly lift plus days off is about two weeks), its
   fingerprint equals the current one, and its strategy was not `discovery`
   (a guess made when no window was known). Otherwise the startup runs as
-  before and the log says why. An unreadable file is logged at WARN.
+  before and the log says why. An unreadable file, or one whose rate-limit
+  data is not an object, is logged at WARN with the file's path. A restored
+  time is used once.
+- A dry run reads the same state and reports the schedule a real start would
+  resume; it never writes.
 - A state that cannot be saved is a WARN, and the wait for a write is bounded
   (5 s): pulsing never stops because of storage.
 - The state belongs to one container: several accounts need a volume each.

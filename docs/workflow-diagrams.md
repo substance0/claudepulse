@@ -160,7 +160,9 @@ With `STATE_DIR` set, the scheduler saves its next planned pulse after every
 scheduling decision. At startup it resumes that time, without a startup pulse
 and with the log naming the strategy `restored`, only when all of these hold:
 
-- the saved pulse time is still ahead;
+- the saved pulse time is still ahead and at most 15 days ahead (a real
+  schedule reaches about two weeks at most; a time further out is ignored with
+  a warning);
 - the scheduling settings (work hours, `SCHEDULED_START_HOUR`,
   `IMMEDIATE_PULSE_AFTER_AUTH`, `ACCOUNT_LABEL`, `TZ`) are unchanged since it
   was saved: a changed setting makes the saved time stale, since it could only

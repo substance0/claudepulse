@@ -99,3 +99,30 @@ test("refuses a state file without a valid next pulse time", async (t) => {
 
   await assert.rejects(createStateStore(dir).load(), /nextPulseAt/);
 });
+
+test("concurrent saves into one directory all succeed", async (t) => {
+  // Two containers starting together share a directory when a volume is
+  // shared; a fixed temporary name made one rename fail
+  const dir = await tempDir(t);
+  const stores = [createStateStore(dir), createStateStore(dir)];
+
+  const saves = Array.from({ length: 40 }, (_, i) =>
+    stores[i % 2].save({ nextPulseAt: new Date(Date.UTC(2026, 9, 5, i)), rateLimit: null }),
+  );
+
+  await Promise.all(saves);
+  assert.ok((await createStateStore(dir).load()).nextPulseAt instanceof Date);
+  assert.deepEqual(await fs.readdir(dir), ["state.json"]);
+});
+
+test("removes its temporary file when the save fails", async (t) => {
+  const dir = await tempDir(t);
+  // A directory where the state file must go makes the rename fail
+  await fs.mkdir(path.join(dir, "state.json"));
+
+  await assert.rejects(
+    createStateStore(dir).save({ nextPulseAt: new Date(), rateLimit: null }),
+  );
+
+  assert.deepEqual(await fs.readdir(dir), ["state.json"]);
+});

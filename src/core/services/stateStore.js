@@ -4,6 +4,7 @@
  * so a restarted container resumes its schedule.
  */
 
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -98,15 +99,22 @@ export function createStateStore(dir) {
      */
     async save({ nextPulseAt, rateLimit }) {
       await fs.mkdir(dir, { recursive: true });
-      const temp = `${file}.tmp`;
+      // A name of its own per save, so concurrent saves into one directory
+      // never write or rename the same temporary file.
+      const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
       const body = {
         version: STATE_VERSION,
         nextPulseAt: toIso(nextPulseAt),
         rateLimit: serialiseRateLimit(rateLimit),
         savedAt: new Date().toISOString(),
       };
-      await fs.writeFile(temp, JSON.stringify(body, null, 2));
-      await fs.rename(temp, file);
+      try {
+        await fs.writeFile(temp, JSON.stringify(body, null, 2));
+        await fs.rename(temp, file);
+      } catch (error) {
+        await fs.rm(temp, { force: true });
+        throw error;
+      }
     },
   };
 }

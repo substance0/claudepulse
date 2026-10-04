@@ -37,7 +37,9 @@ services:
     # Healthcheck comes from the image, which verifies the Claude CLI that
     # pulses run. Defining one here would override it.
     restart: unless-stopped
-    # State file for STATE_DIR=/data (optional):
+    # State file for STATE_DIR=/data (optional). Use one volume per
+    # container: a state file belongs to one account, so containers for
+    # several accounts must not share it.
     # volumes:
     #   - claudepulse-data:/data
 

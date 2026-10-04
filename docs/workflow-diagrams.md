@@ -8,7 +8,9 @@ This document presents the functional workflows of the ClaudePulse application u
 
 ```mermaid
 graph LR
-    Start([Start]) --> Pulse[Run Claude Code<br/>claude -p]
+    Start([Start]) --> Saved{Resumable saved<br/>schedule?<br/>STATE_DIR}
+    Saved -->|Yes| Wait
+    Saved -->|No| Pulse[Run Claude Code<br/>claude -p]
     Pulse --> Read{Rate-limit event}
     Read -->|Allowed| Window[Next pulse:<br/>5-hour reset + 10s]
     Read -->|Limit reached| Blocked[Next pulse:<br/>blocking reset + 10s]
@@ -19,6 +21,7 @@ graph LR
     Wait --> Pulse
 
     style Start fill:#e1f5fe
+    style Saved fill:#e0f2f1
     style Pulse fill:#fff9c4
     style Read fill:#e0f2f1
     style Window fill:#e8f5e9
@@ -30,7 +33,7 @@ graph LR
 **Key Points:**
 
 - **Window-driven**: every pulse reports when its window resets, as a timestamp; one pulse per window is enough
-- **Stateless**: no credentials, logs or volume; the startup pulse relearns the window after a restart
+- **Stateless by default**: no credentials, logs or volume; the startup pulse relearns the window after a restart. With `STATE_DIR`, the planned pulse is saved and a restart resumes it instead (see "Resuming After a Restart" below)
 - **Resilient**: transient failures are retried with backoff; authentication failures and usage limits are not
 
 See detailed workflows below ↓
@@ -76,7 +79,7 @@ graph TD
     _On SIGINT/SIGTERM_`"]
 ```
 
-There is no authentication step at startup. Claude Code authenticates each pulse itself from `CLAUDE_CODE_OAUTH_TOKEN`. A missing or rejected token shows up as a failed startup pulse, which raises an alert immediately.
+There is no authentication step at startup. Claude Code authenticates each pulse itself from `CLAUDE_CODE_OAUTH_TOKEN`. A missing or rejected token shows up as a failed startup pulse, which raises an alert immediately. A restart that resumes a saved schedule (`STATE_DIR`) sends no startup pulse, so the first scheduled pulse reports it instead.
 
 ## 2. Scheduler Workflow
 
@@ -150,6 +153,25 @@ graph TD
     style E fill:#e8f5e9
     style F fill:#fff3e0
 ```
+
+### Resuming After a Restart
+
+With `STATE_DIR` set, the scheduler saves its next planned pulse after every
+scheduling decision. At startup it resumes that time, without a startup pulse
+and with the log naming the strategy `restored`, only when all of these hold:
+
+- the saved pulse time is still ahead;
+- the scheduling settings (work hours, `SCHEDULED_START_HOUR`,
+  `IMMEDIATE_PULSE_AFTER_AUTH`, `ACCOUNT_LABEL`, `TZ`) are unchanged since it
+  was saved: a changed setting makes the saved time stale, since it could only
+  delay a pulse the new settings want sooner;
+- it was based on a known window, not on the `discovery` guess made when no
+  window was known (for example after a failed cycle), so a restart with a
+  fixed token pulses at once to confirm it works.
+
+Otherwise the startup pulse runs as usual. The resumed time is used once;
+every later pulse follows the strategies above. With work hours on, a resumed
+time outside them still moves to the working day.
 
 ## 4. Pulse Execution
 
@@ -257,7 +279,7 @@ graph TB
 
 1. **Run the licensed client**: pulses run Claude Code itself; ClaudePulse holds no credentials
 2. **Structured over parsed**: the window reset comes from a timestamp in the rate-limit event, not from reading message text
-3. **Stateless**: no volume, no logs to scan; a restart relearns the window with one pulse
+3. **Stateless by default**: no volume, no logs to scan; a restart relearns the window with one pulse, unless `STATE_DIR` saves the schedule
 4. **Cheap pulses**: every flag in the pulse argument list is there to reduce cost, and the cost was measured
 5. **Signal, not noise**: expected conditions (usage limits) never alert; real failures alert at spaced intervals
 6. **Containerization**: Docker-first approach for consistent deployment

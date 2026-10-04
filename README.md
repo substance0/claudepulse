@@ -223,7 +223,7 @@ services:
     restart: unless-stopped
 ```
 
-Both can share Discord webhooks: every message names its account.
+Both can share Discord webhooks: every message names its account. If you enable `STATE_DIR`, give each container a volume of its own (for example `claudepulse-work-data` and `claudepulse-personal-data`): a state file belongs to one account.
 
 ## Image Tags
 

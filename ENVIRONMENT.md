@@ -43,6 +43,8 @@ Complete reference for ClaudePulse environment variables and configuration optio
   it is explicit configuration
 - Every later pulse follows the window reset (see Pulse Scheduling below)
 - This is NOT a daily anchor - one-time use only
+- With `STATE_DIR`, a restart resumes the saved schedule instead; changing
+  this setting makes the saved schedule stale, so the next start ignores it
 
 **Example:**
 
@@ -130,6 +132,7 @@ resets, as a timestamp. The next pulse is scheduled from it:
 | Allowed                            | 10 seconds after the 5-hour window resets   |
 | Usage limit reached                | 10 seconds after the blocking window resets |
 | Reported no window (e.g. it failed)| On the next hour, to learn the window       |
+| (Restart with `STATE_DIR`)         | The saved pulse time, once; see [`STATE_DIR`](#state_dir) |
 
 A single successful pulse is enough to learn the window, so in normal operation
 ClaudePulse pulses once per window. Reset times are used as reported, not
@@ -316,13 +319,29 @@ alert, which surfaces a bad token as soon as the container starts. With
 startup.
 
 **Type:** Absolute path
-**Default:** Unset (no state; every start pulses to learn the window)
+**Default:** Unset (no state is saved or resumed)
 
 ClaudePulse writes `state.json` there after every scheduling decision. At
-startup, a saved pulse time still ahead is resumed, without a startup pulse; a
-past, missing or unreadable state is ignored, and an unreadable one is logged
-as a warning. A state that cannot be saved is also only a warning: pulsing
-continues. Mount a volume so the file survives the container:
+startup, a saved pulse time is resumed, without a startup pulse, only when:
+
+- it is still ahead;
+- the scheduling settings are unchanged since it was saved: `WORK_HOURS_ENABLED`
+  and the other work-hours settings, `SCHEDULED_START_HOUR`,
+  `IMMEDIATE_PULSE_AFTER_AUTH`, `ACCOUNT_LABEL` and `TZ`. A changed setting
+  could otherwise leave a pulse the new settings want sooner waiting, for
+  example for days after work hours are switched off;
+- it was based on a known window. After a failed cycle the next pulse is only
+  a guess (the next hour), so a restart, for example with a fixed token,
+  pulses at once to confirm it works.
+
+Otherwise the startup pulse runs as usual, and the log says why. A missing or
+past state is ignored silently, and an unreadable one with a warning. A state
+that cannot be saved is also only a warning, and a write that hangs is given
+up on after 5 seconds: pulsing continues either way.
+
+Mount a volume so the file survives the container. **Use one volume per
+container**: the state belongs to one account and one set of settings, so
+containers for several accounts must not share a directory.
 
 ```bash
 docker run -d --name claudepulse --restart unless-stopped \
@@ -330,12 +349,16 @@ docker run -d --name claudepulse --restart unless-stopped \
   --env-file claudepulse.env ghcr.io/substance0/claudepulse:latest
 ```
 
-The image creates `/data` for the `claudepulse` user, so a new named volume
-is writable. A bind mount keeps its host ownership: it must be writable by the
-container's user (`docker exec claudepulse id` shows it).
+The image creates `/data` for the `claudepulse` user (uid 1001), so a new
+named volume is writable. A bind mount keeps its host ownership: it must be
+writable by uid 1001.
 
 With work hours on, a resumed time outside them still moves to the working
-day.
+day. To start fresh, delete the saved state and restart:
+
+```bash
+docker exec claudepulse rm /data/state.json && docker restart claudepulse
+```
 
 ---
 
@@ -523,8 +546,8 @@ docker run -d --name claudepulse \
 ```
 
 `claudepulse.env` holds `CLAUDE_CODE_OAUTH_TOKEN`. No volume is needed:
-ClaudePulse keeps no state between restarts, and the startup pulse learns the
-current window again.
+without `STATE_DIR`, ClaudePulse keeps no state between restarts, and the
+startup pulse learns the current window again.
 
 ### Docker Compose
 
@@ -553,8 +576,9 @@ services:
 because pulses are failing.
 
 ```bash
-# Which strategy scheduled the next pulse (window_reset is normal):
-docker logs claudepulse 2>&1 | grep -i "Strategy selected"
+# Which strategy scheduled each pulse (window_reset is normal; restored once
+# after a restart that resumed a saved schedule):
+docker logs claudepulse 2>&1 | grep -i "next_pulse_scheduled"
 
 # Whether pulses report a window reset (failures are warnings, on stderr):
 docker logs claudepulse 2>&1 | grep -i "windowResetsAt\|Pulse failed"

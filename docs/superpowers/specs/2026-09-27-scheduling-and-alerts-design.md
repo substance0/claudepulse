@@ -152,17 +152,27 @@ Claude CLI can also send `overageResetsAt`, `overageInUse`, `limitScope`,
 
 ## 6. Persisted schedule (T53, Q27 a)
 
-- New optional setting `STATE_DIR`. When set, the scheduler writes
-  `<STATE_DIR>/state.json` after every scheduling decision:
-  `{ "version": 1, "nextPulseAt": ISO, "rateLimit": {…}, "savedAt": ISO }`,
-  written to a temp file then renamed.
-- At startup, a saved `nextPulseAt` still in the future replaces the startup
-  pulse: the saved rate-limit state is restored and the pulse is scheduled at
-  that time (strategy `restored`, then the work-hours constraint).
-  A past, missing or unreadable state starts as today; an unreadable file is
-  logged at WARN.
-- The image creates `/data` owned by the `claudepulse` user, so a named
-  volume mounted there is writable. The compose file documents
+- New optional setting `STATE_DIR` (absolute path). When set, the scheduler
+  writes `<STATE_DIR>/state.json` after every scheduling decision:
+  `{ "version": 1, "nextPulseAt": ISO, "rateLimit": {status, resetsAt,
+  fiveHourResetsAt, limitType, weekly}, "strategy", "fingerprint",
+  "savedAt": ISO }`, each save to a temporary file of its own, then renamed.
+  `strategy` is what the time was based on, before work hours moved it;
+  `fingerprint` identifies the scheduling settings (work hours,
+  `SCHEDULED_START_HOUR`, `IMMEDIATE_PULSE_AFTER_AUTH`, `ACCOUNT_LABEL`,
+  `TZ`). The extra-usage and unknown-field parts of the rate-limit state are
+  not saved.
+- At startup, a saved `nextPulseAt` replaces the startup pulse, with the
+  rate-limit state restored and the strategy named `restored` (then the
+  work-hours constraint), only when it is still in the future, its
+  fingerprint equals the current one, and its strategy was not `discovery`
+  (a guess made when no window was known). Otherwise the startup runs as
+  before and the log says why. An unreadable file is logged at WARN.
+- A state that cannot be saved is a WARN, and the wait for a write is bounded
+  (5 s): pulsing never stops because of storage.
+- The state belongs to one container: several accounts need a volume each.
+- The image creates `/data` owned by the `claudepulse` user (uid 1001), so a
+  named volume mounted there is writable. The compose file documents
   `STATE_DIR=/data` with a named volume.
 
 ## Out of scope

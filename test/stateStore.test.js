@@ -216,3 +216,40 @@ test("the fingerprint ignores settings that do not change the schedule", () => {
   assert.equal(scheduleFingerprint({ ...SETTINGS, LOG_LEVEL: "DEBUG" }), base);
   assert.equal(scheduleFingerprint({ ...SETTINGS, DISCORD_WEBHOOK_URL: undefined }), base);
 });
+
+test("refuses a state file whose rate limit is not an object", async (t) => {
+  const dir = await tempDir(t);
+  for (const rateLimit of ["oops", 5, true, ["a"]]) {
+    await fs.writeFile(
+      path.join(dir, "state.json"),
+      JSON.stringify({ version: 1, nextPulseAt: "2026-09-30T09:00:10.000Z", rateLimit }),
+    );
+
+    await assert.rejects(createStateStore(dir).load(), /rateLimit/, JSON.stringify(rateLimit));
+  }
+});
+
+test("refuses a state file whose weekly window is not an object", async (t) => {
+  const dir = await tempDir(t);
+  await fs.writeFile(
+    path.join(dir, "state.json"),
+    JSON.stringify({
+      version: 1,
+      nextPulseAt: "2026-09-30T09:00:10.000Z",
+      rateLimit: { status: "allowed", weekly: "oops" },
+    }),
+  );
+
+  await assert.rejects(createStateStore(dir).load(), /weekly/);
+});
+
+test("names the state file in every load error", async (t) => {
+  const dir = await tempDir(t);
+  const file = path.join(dir, "state.json");
+
+  await fs.writeFile(file, '{"version":1,"nextPu');
+  await assert.rejects(createStateStore(dir).load(), (error) => error.message.includes(file));
+
+  await fs.writeFile(file, JSON.stringify({ version: 2 }));
+  await assert.rejects(createStateStore(dir).load(), (error) => error.message.includes(file));
+});

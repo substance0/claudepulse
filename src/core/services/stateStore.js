@@ -43,8 +43,19 @@ function serialiseRateLimit(rateLimit) {
   };
 }
 
+/** Whether a value is a plain object, as a saved record must be. */
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function reviveRateLimit(data) {
-  if (!data) return null;
+  if (data === null || data === undefined) return null;
+  if (!isRecord(data)) {
+    throw new Error("State has an invalid rateLimit");
+  }
+  if (data.weekly !== null && data.weekly !== undefined && !isRecord(data.weekly)) {
+    throw new Error("State has an invalid rateLimit.weekly");
+  }
   return {
     status: data.status,
     resetsAt: fromIso(data.resetsAt),
@@ -100,24 +111,29 @@ export function createStateStore(dir) {
         text = await fs.readFile(file, "utf8");
       } catch (error) {
         if (error.code === "ENOENT") return null;
-        throw error;
+        throw new Error(`${file}: ${error.message}`, { cause: error });
       }
 
-      const data = JSON.parse(text);
-      if (data?.version !== STATE_VERSION) {
-        throw new Error(`Unsupported state version: ${data?.version}`);
+      // Every error names the file, so an operator can tell which one is bad.
+      try {
+        const data = JSON.parse(text);
+        if (data?.version !== STATE_VERSION) {
+          throw new Error(`Unsupported state version: ${data?.version}`);
+        }
+        const nextPulseAt = fromIso(data.nextPulseAt);
+        if (!nextPulseAt) {
+          throw new Error("State has no valid nextPulseAt");
+        }
+        return {
+          nextPulseAt,
+          rateLimit: reviveRateLimit(data.rateLimit),
+          strategy: typeof data.strategy === "string" ? data.strategy : null,
+          fingerprint:
+            typeof data.fingerprint === "string" ? data.fingerprint : null,
+        };
+      } catch (error) {
+        throw new Error(`${file}: ${error.message}`, { cause: error });
       }
-      const nextPulseAt = fromIso(data.nextPulseAt);
-      if (!nextPulseAt) {
-        throw new Error("State has no valid nextPulseAt");
-      }
-      return {
-        nextPulseAt,
-        rateLimit: reviveRateLimit(data.rateLimit),
-        strategy: typeof data.strategy === "string" ? data.strategy : null,
-        fingerprint:
-          typeof data.fingerprint === "string" ? data.fingerprint : null,
-      };
     },
 
     /**

@@ -1,3 +1,22 @@
+# [2.6.0](https://github.com/substance0/claudepulse/compare/v2.5.0...v2.6.0) (2026-10-04)
+
+
+### Bug Fixes
+
+* give each state save a temporary file of its own ([0acd9a8](https://github.com/substance0/claudepulse/commit/0acd9a8e73a5cf157c9fff3882351a45a5e2e599))
+* make a dry run report the saved schedule a real start would resume ([0741846](https://github.com/substance0/claudepulse/commit/07418460cbceb11588e6d7a8d4635c89a447fd5a))
+* never let a hung state write stop the next pulse being scheduled ([241ac3c](https://github.com/substance0/claudepulse/commit/241ac3cee5cbd18b6e8fedc4ecdc7b91b1fc2fe8))
+* refuse a saved pulse time beyond any real schedule and pin that it is used once ([a962bd7](https://github.com/substance0/claudepulse/commit/a962bd781216fc7368a1f339583429d363b8c060))
+* resume a saved schedule only under the same settings and a known window ([c2d87d5](https://github.com/substance0/claudepulse/commit/c2d87d5b52cf925dd5c9bf32e65fc3675ac1cd39))
+* validate the saved rate limit's shape and name the state file in load errors ([ff9aa0f](https://github.com/substance0/claudepulse/commit/ff9aa0f47860f13ac30ff01eaa2f691ae8762140))
+
+
+### Features
+
+* enable the state file with STATE_DIR ([6038c64](https://github.com/substance0/claudepulse/commit/6038c645f708ab4fbe1387f1efd7696e7e00752a))
+* resume the planned pulse after a restart ([bfa7b1b](https://github.com/substance0/claudepulse/commit/bfa7b1b53e77f881f5adc48e1f706271fcd496ed))
+* store the next planned pulse in a state file ([cf0b299](https://github.com/substance0/claudepulse/commit/cf0b299e1a324efff77504140a7f2256722a9d5c))
+
 # [2.5.0](https://github.com/substance0/claudepulse/compare/v2.4.0...v2.5.0) (2026-10-04)
 
 

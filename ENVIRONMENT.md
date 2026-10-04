@@ -25,6 +25,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `DISCORD_WINDOW_WEBHOOK_URL` | String  | `unset`         | Discord webhook announcing window reset times   |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | String  | required        | Token from `claude setup-token`                 |
 | `TOKEN_EXPIRES_AT`           | Date    | `unset`         | Token expiry (`YYYY-MM-DD`) for warnings        |
+| `STATE_DIR`                  | Path    | `unset`         | Directory for the state file (resume after restart) |
 
 ## Core Configuration
 
@@ -304,7 +305,37 @@ KEEP_PULSE_ON_FAILURE=true
 
 **Use Case:** The startup pulse reports when the current window resets, so
 the first scheduled pulse can follow it. A startup pulse that fails raises an
-alert, which surfaces a bad token as soon as the container starts.
+alert, which surfaces a bad token as soon as the container starts. With
+`STATE_DIR` set, a restart that finds a saved schedule resumes it instead.
+
+---
+
+### `STATE_DIR`
+
+**Purpose:** Resume the planned pulse after a restart instead of pulsing at
+startup.
+
+**Type:** Absolute path
+**Default:** Unset (no state; every start pulses to learn the window)
+
+ClaudePulse writes `state.json` there after every scheduling decision. At
+startup, a saved pulse time still ahead is resumed, without a startup pulse; a
+past, missing or unreadable state is ignored, and an unreadable one is logged
+as a warning. A state that cannot be saved is also only a warning: pulsing
+continues. Mount a volume so the file survives the container:
+
+```bash
+docker run -d --name claudepulse --restart unless-stopped \
+  -e STATE_DIR=/data -v claudepulse-data:/data \
+  --env-file claudepulse.env ghcr.io/substance0/claudepulse:latest
+```
+
+The image creates `/data` for the `claudepulse` user, so a new named volume
+is writable. A bind mount keeps its host ownership: it must be writable by the
+container's user (`docker exec claudepulse id` shows it).
+
+With work hours on, a resumed time outside them still moves to the working
+day.
 
 ---
 

@@ -52,7 +52,7 @@ See the [workflow diagrams](docs/workflow-diagrams.md) for the full scheduling l
 | **Window Notifications**    | Optional Discord message each time a window opens (with weekly usage) or a 5-hour or weekly limit is reached, with reset times in your local time zone |
 | **Spaced Failure Alerts**   | Optional Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so an outage stays visible without flooding the channel |
 | **Retry with Backoff**      | Exponential backoff (configurable multiplier and maximum delay) for transient failures; authentication failures are not retried     |
-| **No Stored Credentials**   | Claude Code authenticates each pulse from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse keeps no credentials and no state                  |
+| **No Stored Credentials**   | Claude Code authenticates each pulse from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse keeps no credentials, and state only when `STATE_DIR` is set |
 | **Small, Verifiable Image** | No npm runtime dependencies, a pinned Claude Code CLI, `linux/amd64` and `linux/arm64` builds, and signed build provenance         |
 
 ## Installation
@@ -155,6 +155,7 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 | `TZ`                         | `UTC`         | Time zone for logs, work hours and `SCHEDULED_START_HOUR`              |
 | `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
 | `TOKEN_EXPIRES_AT`           | unset         | Token expiry (`YYYY-MM-DD`); warnings 14, 7 and 1 day before, and once expired |
+| `STATE_DIR`                  | unset         | Absolute directory for a state file, so a restart resumes the planned pulse (mount a volume there, e.g. `/data`) |
 | `WORK_HOURS_ENABLED`         | `false`       | Turns work hours on (see [Work Hours](ENVIRONMENT.md#work-hours))       |
 | `WORK_START`                 | unset         | When your working day starts (`HH:MM`); required when enabled          |
 | `WORK_END`                   | unset         | No window starts at or after this time (`HH:MM`); required when enabled |

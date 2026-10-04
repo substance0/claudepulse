@@ -18,6 +18,10 @@ services:
 
       # Logging configuration
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+      # Resume the planned pulse after a restart (optional): uncomment this
+      # line and the volume at the end of this file.
+      # - STATE_DIR=/data
     # Secrets, one per line, next to this file (chmod 600):
     #   CLAUDE_CODE_OAUTH_TOKEN=...      required, from `claude setup-token`
     #   DISCORD_WEBHOOK_URL=...          optional, error alerts
@@ -33,3 +37,9 @@ services:
     # Healthcheck comes from the image, which verifies the Claude CLI that
     # pulses run. Defining one here would override it.
     restart: unless-stopped
+    # State file for STATE_DIR=/data (optional):
+    # volumes:
+    #   - claudepulse-data:/data
+
+# volumes:
+#   claudepulse-data:

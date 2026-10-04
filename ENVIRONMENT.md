@@ -21,7 +21,7 @@ Complete reference for ClaudePulse environment variables and configuration optio
 | `DRY_RUN`                    | Boolean | `false`         | Test mode - analyze schedule without sending    |
 | `KEEP_PULSE_ON_FAILURE`      | Boolean | `false`         | Keep container running on auth failures         |
 | `IMMEDIATE_PULSE_AFTER_AUTH` | Boolean | `true`          | Pulse at startup to learn the current window    |
-| `DISCORD_WEBHOOK_URL`        | String  | `unset`         | Discord webhook for errors and token warnings   |
+| `DISCORD_ERROR_WEBHOOK_URL`  | String  | `unset`         | Discord webhook for errors and alerts           |
 | `DISCORD_WINDOW_WEBHOOK_URL` | String  | `unset`         | Discord webhook announcing window reset times   |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | String  | required        | Token from `claude setup-token`                 |
 | `TOKEN_EXPIRES_AT`           | Date    | `unset`         | Token expiry (`YYYY-MM-DD`) for warnings        |
@@ -408,7 +408,7 @@ a failed pulse, which is reported without retrying (see `MAX_RETRIES`).
 **Default:** Unset (no warnings)
 
 ClaudePulse cannot read the token's expiry, so record it here: one year
-after you ran `claude setup-token`. Warnings go to `DISCORD_WEBHOOK_URL` and
+after you ran `claude setup-token`. Warnings go to `DISCORD_ERROR_WEBHOOK_URL` and
 the log when 14, 7 and 1 day(s) are left, and once it has expired. A restart
 re-sends the current warning once.
 
@@ -418,12 +418,18 @@ TOKEN_EXPIRES_AT=2027-09-25
 
 ---
 
-### `DISCORD_WEBHOOK_URL`
+### `DISCORD_ERROR_WEBHOOK_URL`
 
-**Purpose:** Enable Discord notifications for error alerts.
+**Purpose:** The dedicated Discord webhook for errors and alerts: failed
+pulses, token expiry warnings and extra usage. Keep it on a channel you do not
+mute; window announcements have a webhook of their own
+(`DISCORD_WINDOW_WEBHOOK_URL`).
 
 **Type:** String (URL)
 **Default:** Unset (no notifications)
+
+**Renamed:** this setting was called `DISCORD_WEBHOOK_URL`. The old name is
+ignored, so rename it in `claudepulse.env` or errors stop reaching Discord.
 
 **Behavior:**
 
@@ -447,7 +453,7 @@ it is not exposed to anyone reading container logs.
    - Copy the webhook URL
 2. Add it to `claudepulse.env`, next to the token, then recreate the container:
    ```bash
-   echo "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN" >> claudepulse.env
+   echo "DISCORD_ERROR_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN" >> claudepulse.env
    ```
 
 The webhook URL is a secret: anyone holding it can post to the channel. Keep
@@ -465,7 +471,7 @@ import('file:///app/src/core/services/notificationService.js').then(m => {
     description: 'Testing Discord webhook',
     level: 'ERROR',
     fields: [{name: 'Status', value: 'Working!', inline: true}]
-  }, process.env.DISCORD_WEBHOOK_URL).then(() => console.log('Sent!'));
+  }, process.env.DISCORD_ERROR_WEBHOOK_URL).then(() => console.log('Sent!'));
 });
 "
 ```

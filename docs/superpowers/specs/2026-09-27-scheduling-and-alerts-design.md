@@ -119,7 +119,7 @@ Rules:
   hourly. It delivers one Discord alert per threshold crossed: 14, 7 and 1
   day(s) left, and 0 (expired). Days left = local calendar days from today to
   the expiry date, so clock changes do not shift a warning.
-- Alerts go to `DISCORD_WEBHOOK_URL` (level WARN; ERROR once expired) and to
+- Alerts go to `DISCORD_ERROR_WEBHOOK_URL` (level WARN; ERROR once expired) and to
   the log; without a webhook, the log only. An alert Discord did not accept
   is retried at the next check; each is logged once. Delivered thresholds are
   kept in memory, so a restart re-sends the current threshold once.

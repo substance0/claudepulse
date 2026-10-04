@@ -23,9 +23,9 @@ services:
       # line and the volume at the end of this file.
       # - STATE_DIR=/data
     # Secrets, one per line, next to this file (chmod 600):
-    #   CLAUDE_CODE_OAUTH_TOKEN=...      required, from `claude setup-token`
-    #   DISCORD_WEBHOOK_URL=...          optional, error alerts
-    #   DISCORD_WINDOW_WEBHOOK_URL=...   optional, window reset announcements
+    #   CLAUDE_CODE_OAUTH_TOKEN=...        required, from `claude setup-token`
+    #   DISCORD_ERROR_WEBHOOK_URL=...      optional, errors and alerts
+    #   DISCORD_WINDOW_WEBHOOK_URL=...     optional, window reset announcements
     # Keep them out of `environment:` above: its values override this file.
     # The env file keeps secrets out of the compose file and shell history;
     # Docker still copies them into the container config (docker inspect).

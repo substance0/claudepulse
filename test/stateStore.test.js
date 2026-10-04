@@ -171,7 +171,7 @@ const SETTINGS = {
   IMMEDIATE_PULSE_AFTER_AUTH: true,
   ACCOUNT_LABEL: "work",
   LOG_LEVEL: "INFO",
-  DISCORD_WEBHOOK_URL: "https://discord.test/hook",
+  DISCORD_ERROR_WEBHOOK_URL: "https://discord.test/hook",
 };
 
 test("the fingerprint is the same for the same scheduling settings", () => {
@@ -214,7 +214,7 @@ test("the fingerprint ignores settings that do not change the schedule", () => {
   const base = scheduleFingerprint(SETTINGS);
 
   assert.equal(scheduleFingerprint({ ...SETTINGS, LOG_LEVEL: "DEBUG" }), base);
-  assert.equal(scheduleFingerprint({ ...SETTINGS, DISCORD_WEBHOOK_URL: undefined }), base);
+  assert.equal(scheduleFingerprint({ ...SETTINGS, DISCORD_ERROR_WEBHOOK_URL: undefined }), base);
 });
 
 test("refuses a state file whose rate limit is not an object", async (t) => {

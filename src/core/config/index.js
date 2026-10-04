@@ -10,7 +10,7 @@ import { parseExpiryDate } from "../services/tokenExpiry.js";
 
 /** Config keys whose values must never reach logs, alerts, or error payloads. */
 const SECRET_CONFIG_KEYS = [
-  "DISCORD_WEBHOOK_URL",
+  "DISCORD_ERROR_WEBHOOK_URL",
   "DISCORD_WINDOW_WEBHOOK_URL",
   "CLAUDE_CODE_OAUTH_TOKEN",
 ];
@@ -45,7 +45,7 @@ const DEFAULT_CONFIG = {
   SCHEDULED_START_HOUR: undefined,
 
   IMMEDIATE_PULSE_AFTER_AUTH: true,
-  DISCORD_WEBHOOK_URL: undefined,
+  DISCORD_ERROR_WEBHOOK_URL: undefined,
   DISCORD_WINDOW_WEBHOOK_URL: undefined,
   ACCOUNT_LABEL: undefined,
   TOKEN_EXPIRES_AT: undefined,
@@ -73,7 +73,7 @@ function parseEnvironmentVariables() {
     SCHEDULED_START_HOUR: process.env.SCHEDULED_START_HOUR,
 
     IMMEDIATE_PULSE_AFTER_AUTH: process.env.IMMEDIATE_PULSE_AFTER_AUTH,
-    DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL,
+    DISCORD_ERROR_WEBHOOK_URL: process.env.DISCORD_ERROR_WEBHOOK_URL,
     DISCORD_WINDOW_WEBHOOK_URL: process.env.DISCORD_WINDOW_WEBHOOK_URL,
     // Trimmed: a stray space in an env file would otherwise show in every label
     ACCOUNT_LABEL: process.env.ACCOUNT_LABEL?.trim() || undefined,

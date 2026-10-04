@@ -176,14 +176,14 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 | Variable                     | Required | Description                                          |
 | ---------------------------- | -------- | ---------------------------------------------------- |
 | `CLAUDE_CODE_OAUTH_TOKEN`    | yes      | Token from `claude setup-token`                      |
-| `DISCORD_WEBHOOK_URL`        | no       | Discord webhook for error alerts and token expiry warnings |
+| `DISCORD_ERROR_WEBHOOK_URL`  | no       | Discord webhook for errors and alerts (token expiry, extra usage) |
 | `DISCORD_WINDOW_WEBHOOK_URL` | no       | Discord webhook announcing each window's reset time  |
 
 ### Discord Notifications (Optional)
 
 ClaudePulse can post to two Discord webhooks:
 
-- **Error alerts** (`DISCORD_WEBHOOK_URL`): failed pulses and other errors, spaced out during an outage, plus token expiry warnings when `TOKEN_EXPIRES_AT` is set.
+- **Errors and alerts** (`DISCORD_ERROR_WEBHOOK_URL`, formerly `DISCORD_WEBHOOK_URL`, whose old name is now ignored): failed pulses and other errors, spaced out during an outage, plus token expiry warnings when `TOKEN_EXPIRES_AT` is set. Keep it on a channel you do not mute.
 - **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, or "Weekly limit reached" with the date it lifts. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
 
 To set one up:

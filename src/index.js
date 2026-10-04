@@ -46,7 +46,7 @@ function setupShutdownHandlers(heartbeatInterval, scheduler, label) {
 function setupProcessErrorHandlers(scheduler, config) {
   const errLogger = new Logger({
     service: "claudepulse-error",
-    discordWebhookUrl: config?.DISCORD_WEBHOOK_URL,
+    discordWebhookUrl: config?.DISCORD_ERROR_WEBHOOK_URL,
     label: config?.ACCOUNT_LABEL,
   });
 
@@ -84,7 +84,7 @@ async function startTokenExpiryMonitor(config, logger) {
   }
   const monitor = createTokenExpiryMonitor({
     expiresAt: parseExpiryDate(config.TOKEN_EXPIRES_AT),
-    webhookUrl: config.DISCORD_WEBHOOK_URL,
+    webhookUrl: config.DISCORD_ERROR_WEBHOOK_URL,
     label: config.ACCOUNT_LABEL,
     logger,
   });
@@ -202,7 +202,7 @@ async function main() {
 
     const logger = new Logger({
       service: "claudepulse",
-      discordWebhookUrl: config.DISCORD_WEBHOOK_URL,
+      discordWebhookUrl: config.DISCORD_ERROR_WEBHOOK_URL,
       label: config.ACCOUNT_LABEL,
     });
 

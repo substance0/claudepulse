@@ -6,14 +6,14 @@ import { redactConfigSecrets } from "../src/core/config/index.js";
 test("masks the Discord webhook URL", () => {
   // Arrange
   const config = {
-    DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/123/s3cr3t-value",
+    DISCORD_ERROR_WEBHOOK_URL: "https://discord.com/api/webhooks/123/s3cr3t-value",
   };
 
   // Act
   const redacted = redactConfigSecrets(config);
 
   // Assert
-  assert.equal(redacted.DISCORD_WEBHOOK_URL, "[REDACTED]");
+  assert.equal(redacted.DISCORD_ERROR_WEBHOOK_URL, "[REDACTED]");
 });
 
 test("masks the OAuth token", () => {
@@ -40,25 +40,25 @@ test("leaves non-secret values untouched", () => {
 
 test("reports unset secrets as unset rather than redacted", () => {
   // Arrange
-  const config = { DISCORD_WEBHOOK_URL: undefined, LOG_LEVEL: "INFO" };
+  const config = { DISCORD_ERROR_WEBHOOK_URL: undefined, LOG_LEVEL: "INFO" };
 
   // Act
   const redacted = redactConfigSecrets(config);
 
   // Assert - masking an absent value would wrongly imply one is configured
-  assert.equal(redacted.DISCORD_WEBHOOK_URL, undefined);
+  assert.equal(redacted.DISCORD_ERROR_WEBHOOK_URL, undefined);
 });
 
 test("does not mutate the config it is given", () => {
   // Arrange
-  const config = { DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1/x" };
+  const config = { DISCORD_ERROR_WEBHOOK_URL: "https://discord.com/api/webhooks/1/x" };
 
   // Act
   redactConfigSecrets(config);
 
   // Assert
   assert.equal(
-    config.DISCORD_WEBHOOK_URL,
+    config.DISCORD_ERROR_WEBHOOK_URL,
     "https://discord.com/api/webhooks/1/x",
   );
 });
@@ -255,5 +255,32 @@ test("reads the state directory", async () => {
     assert.equal(loadConfig().STATE_DIR, "/data");
   } finally {
     delete process.env.STATE_DIR;
+  }
+});
+
+test("reads the errors webhook from DISCORD_ERROR_WEBHOOK_URL", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.DISCORD_ERROR_WEBHOOK_URL = "https://discord.com/api/webhooks/5/errors";
+
+  try {
+    assert.equal(
+      loadConfig().DISCORD_ERROR_WEBHOOK_URL,
+      "https://discord.com/api/webhooks/5/errors",
+    );
+  } finally {
+    delete process.env.DISCORD_ERROR_WEBHOOK_URL;
+  }
+});
+
+test("ignores the previous name of the errors webhook setting", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/6/old-name";
+
+  try {
+    const config = loadConfig();
+    assert.equal(config.DISCORD_ERROR_WEBHOOK_URL, undefined);
+    assert.equal("DISCORD_WEBHOOK_URL" in config, false);
+  } finally {
+    delete process.env.DISCORD_WEBHOOK_URL;
   }
 });

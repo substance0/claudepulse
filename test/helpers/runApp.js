@@ -36,7 +36,7 @@ export async function runUntilStopped(env, { cwd } = {}) {
         ...process.env,
         CLAUDE_CODE_OAUTH_TOKEN: "placeholder",
         IMMEDIATE_PULSE_AFTER_AUTH: "false",
-        DISCORD_WEBHOOK_URL: "",
+        DISCORD_ERROR_WEBHOOK_URL: "",
         DISCORD_WINDOW_WEBHOOK_URL: "",
         STATE_DIR: "",
         NO_COLOR: "1",

@@ -8,7 +8,7 @@ import fs from "node:fs";
 const COMPOSE_FILES = ["docker-compose.yml", "docker-compose.dev.yml"];
 const SECRETS = [
   "CLAUDE_CODE_OAUTH_TOKEN",
-  "DISCORD_WEBHOOK_URL",
+  "DISCORD_ERROR_WEBHOOK_URL",
   "DISCORD_WINDOW_WEBHOOK_URL",
 ];
 

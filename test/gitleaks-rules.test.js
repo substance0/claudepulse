@@ -38,7 +38,7 @@ test("flags a Claude Code OAuth token", { skip }, () => {
 test("flags a Discord webhook URL", { skip }, () => {
   const url = `https://discord.com/api/webhooks/123456789012345678/${FAKE_BODY}Zk3`;
 
-  const result = scan(`DISCORD_WEBHOOK_URL=${url}\n`);
+  const result = scan(`DISCORD_ERROR_WEBHOOK_URL=${url}\n`);
 
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stderr + result.stdout, /discord-webhook-url/);
@@ -47,7 +47,7 @@ test("flags a Discord webhook URL", { skip }, () => {
 test("ignores the placeholders used in the documentation", { skip }, () => {
   const docs = [
     "CLAUDE_CODE_OAUTH_TOKEN=<token>",
-    "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...",
+    "DISCORD_ERROR_WEBHOOK_URL=https://discord.com/api/webhooks/...",
   ].join("\n");
 
   const result = scan(docs);

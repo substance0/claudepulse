@@ -1,3 +1,13 @@
+# [2.5.0](https://github.com/substance0/claudepulse/compare/v2.4.0...v2.5.0) (2026-10-04)
+
+
+### Features
+
+* keep rate-limit fields the executor does not understand ([71ad645](https://github.com/substance0/claudepulse/commit/71ad64587cc5040f7dd016ded0569204139f639d))
+* log unrecognised rate-limit fields once ([b1a7a68](https://github.com/substance0/claudepulse/commit/b1a7a688fc0b58eadf1eee10dab989cb03db8932))
+* read extra-usage state from each pulse's rate limit ([dd6e67d](https://github.com/substance0/claudepulse/commit/dd6e67db30af69110b43a1fd64b0d9c068c912d7))
+* show extra usage in the pulse log and keep billing values out of the probe ([a2c18a2](https://github.com/substance0/claudepulse/commit/a2c18a29208fc0e045beb04f4e9c41e17ed6823e))
+
 # [2.4.0](https://github.com/substance0/claudepulse/compare/v2.3.0...v2.4.0) (2026-10-03)
 
 

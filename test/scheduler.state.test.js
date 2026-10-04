@@ -296,3 +296,59 @@ test("a state write that fails after the wait is not an unhandled rejection", as
 
   assert.deepEqual(unhandled, []);
 });
+
+const DAY_MS = 24 * HOUR_MS;
+
+test("ignores a saved pulse further ahead than any real schedule", async () => {
+  // A weekly lift plus a day off is about two weeks; 20 days is a hand edit
+  // or a clock that was set ahead
+  const { scheduler, record } = buildScheduler({
+    stateStore: memoryStore(savedState({ nextPulseAt: new Date(Date.now() + 20 * DAY_MS) })),
+  });
+
+  await startAndStop(scheduler);
+
+  assert.equal(record.attempts, 1);
+  assert.ok(record.warnings.some((m) => /too far ahead/i.test(m)), record.warnings.join("\n"));
+});
+
+test("resumes a saved pulse about two weeks ahead", async () => {
+  const { scheduler, record } = buildScheduler({
+    stateStore: memoryStore(savedState({ nextPulseAt: new Date(Date.now() + 14 * DAY_MS) })),
+  });
+
+  await startAndStop(scheduler);
+
+  assert.equal(record.attempts, 0);
+  assert.equal(record.scheduled.at(-1).strategy, "restored");
+});
+
+test("uses a restored pulse time once, then follows the window", async () => {
+  // Arrange: a saved schedule whose window resets in 3 hours
+  const windowReset = new Date(Date.now() + 3 * HOUR_MS);
+  const rateLimit = { status: "allowed", resetsAt: windowReset, fiveHourResetsAt: windowReset };
+  const { scheduler, record } = buildScheduler({
+    stateStore: memoryStore(savedState({ rateLimit })),
+  });
+
+  // Act: the startup schedule, then the next one
+  try {
+    await scheduler.start();
+    await scheduler._scheduleNext();
+  } finally {
+    await scheduler.shutdown();
+  }
+
+  // Assert
+  assert.equal(record.scheduled[0].strategy, "restored");
+  assert.equal(record.scheduled[1].strategy, "window_reset");
+});
+
+test("forgets a restored time that was never used", async () => {
+  const { scheduler } = buildScheduler({ stateStore: memoryStore(null) });
+  scheduler.restoredNextPulseAt = new Date(Date.now() + HOUR_MS);
+
+  await scheduler._restoreState();
+
+  assert.equal(scheduler.restoredNextPulseAt, null);
+});

@@ -74,6 +74,9 @@ function isUnrecoverableAuthError(error) {
 /** How long scheduling waits for the state file to be written. */
 const STATE_SAVE_TIMEOUT_MS = 5000;
 
+/** The furthest ahead a saved pulse time may be and still be resumed. */
+const MAX_RESTORE_AHEAD_MS = 15 * 24 * 60 * 60 * 1000;
+
 /** Unrecognised rate-limit fields whose values describe the account's billing. */
 const BILLING_FIELDS = new Set([
   "canUserPurchaseCredits",
@@ -327,12 +330,24 @@ export class PulseScheduler {
    * @returns {Promise<boolean>} Whether a schedule was restored
    */
   async _restoreState() {
+    // A time left over from an earlier start is never carried forward.
+    this.restoredNextPulseAt = null;
     if (!this.stateStore) {
       return false;
     }
     try {
       const saved = await this.stateStore.load();
       if (!saved || saved.nextPulseAt <= new Date()) {
+        return false;
+      }
+      // The furthest a real schedule reaches is a weekly limit lifting plus a
+      // few days off; beyond that the file was edited or the clock was wrong.
+      if (saved.nextPulseAt.getTime() - Date.now() > MAX_RESTORE_AHEAD_MS) {
+        this.logger.warn(
+          "startup",
+          "Ignoring the saved schedule: its pulse time is too far ahead",
+          { planned: saved.nextPulseAt.toISOString() },
+        );
         return false;
       }
       // A schedule computed under other settings could only delay a pulse the

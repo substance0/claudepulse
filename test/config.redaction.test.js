@@ -239,3 +239,21 @@ test("trims spaces around the token expiry date", async () => {
     delete process.env.TOKEN_EXPIRES_AT;
   }
 });
+
+test("rejects a relative state directory", async () => {
+  const { loadConfig, validateConfig } = await import("../src/core/config/index.js");
+  const config = { ...loadConfig(), STATE_DIR: "data" };
+
+  assert.throws(() => validateConfig(config), /STATE_DIR must be an absolute path/);
+});
+
+test("reads the state directory", async () => {
+  const { loadConfig } = await import("../src/core/config/index.js");
+  process.env.STATE_DIR = "/data";
+
+  try {
+    assert.equal(loadConfig().STATE_DIR, "/data");
+  } finally {
+    delete process.env.STATE_DIR;
+  }
+});

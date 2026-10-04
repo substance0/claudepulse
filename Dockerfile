@@ -44,6 +44,10 @@ ENV CLAUDEPULSE_VERSION=${VERSION}
 RUN chown -R claudepulse:claudepulse /app && \
     chmod +x src/index.js
 
+# Holds the state file when STATE_DIR=/data; a named volume mounted here
+# inherits this ownership.
+RUN mkdir -p /data && chown claudepulse:claudepulse /data
+
 # Switch to non-root user
 USER claudepulse
 

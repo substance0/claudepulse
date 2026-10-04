@@ -49,3 +49,12 @@ test("per-build values come after the expensive layers", () => {
 test("the healthcheck runs the Claude CLI", () => {
   assert.match(dockerfile(), /HEALTHCHECK[\s\S]*claude --version/);
 });
+
+test("creates a writable /data for the state file before dropping root", () => {
+  const text = dockerfile();
+  const createData = text.search(/mkdir -p \/data && chown claudepulse:claudepulse \/data/);
+  const dropRoot = text.indexOf("USER claudepulse");
+
+  assert.ok(createData > -1, "/data is not created");
+  assert.ok(createData < dropRoot, "/data must be created before USER claudepulse");
+});

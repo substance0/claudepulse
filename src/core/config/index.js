@@ -3,6 +3,8 @@
  * Consolidates all environment variables and defaults in one place
  */
 
+import path from "node:path";
+
 import { workHoursErrors } from "../../features/scheduling/workHours.js";
 import { parseExpiryDate } from "../services/tokenExpiry.js";
 
@@ -47,6 +49,7 @@ const DEFAULT_CONFIG = {
   DISCORD_WINDOW_WEBHOOK_URL: undefined,
   ACCOUNT_LABEL: undefined,
   TOKEN_EXPIRES_AT: undefined,
+  STATE_DIR: undefined,
   WORK_HOURS_ENABLED: false,
   WORK_START: undefined,
   WORK_END: undefined,
@@ -75,6 +78,7 @@ function parseEnvironmentVariables() {
     // Trimmed: a stray space in an env file would otherwise show in every label
     ACCOUNT_LABEL: process.env.ACCOUNT_LABEL?.trim() || undefined,
     TOKEN_EXPIRES_AT: process.env.TOKEN_EXPIRES_AT?.trim() || undefined,
+    STATE_DIR: process.env.STATE_DIR?.trim() || undefined,
     WORK_HOURS_ENABLED: process.env.WORK_HOURS_ENABLED,
     WORK_START: process.env.WORK_START || undefined,
     WORK_END: process.env.WORK_END || undefined,
@@ -172,6 +176,10 @@ export function validateConfig(config) {
     !parseExpiryDate(config.TOKEN_EXPIRES_AT)
   ) {
     errors.push("TOKEN_EXPIRES_AT must be a date as YYYY-MM-DD, e.g. 2027-09-25");
+  }
+
+  if (config.STATE_DIR !== undefined && !path.isAbsolute(config.STATE_DIR)) {
+    errors.push("STATE_DIR must be an absolute path, e.g. /data");
   }
 
   errors.push(...workHoursErrors(config));

@@ -14,7 +14,7 @@ function allowedPulse(windowReset) {
   };
 }
 
-function buildScheduler({ stateStore, workHours, stateFingerprint = "fp" }) {
+function buildScheduler({ stateStore, workHours, stateFingerprint = "fp", stateSaveTimeoutMs }) {
   const record = { attempts: 0, scheduled: [], warnings: [] };
   const logger = {
     info() {},
@@ -41,6 +41,7 @@ function buildScheduler({ stateStore, workHours, stateFingerprint = "fp" }) {
     config: { PROMPT_TEXT: "pulse check", MAX_RETRIES: 3 },
     stateStore,
     stateFingerprint,
+    stateSaveTimeoutMs,
     workHours,
   });
   return { scheduler, record };
@@ -259,4 +260,39 @@ test("says why a saved schedule is not resumed", async () => {
   await startAndStop(scheduler);
 
   assert.ok(infos.some((m) => /settings changed/i.test(m)), infos.join("\n"));
+});
+
+test("a state write that never finishes does not stop the next pulse being scheduled", async () => {
+  // A hung network volume must not stall pulsing
+  const { scheduler, record } = buildScheduler({
+    stateStore: { load: async () => null, save: () => new Promise(() => {}) },
+    stateSaveTimeoutMs: 20,
+  });
+
+  await startAndStop(scheduler);
+
+  assert.equal(record.scheduled.length, 1);
+  assert.ok(record.warnings.some((m) => /state/i.test(m)), record.warnings.join("\n"));
+});
+
+test("a state write that fails after the wait is not an unhandled rejection", async () => {
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const { scheduler } = buildScheduler({
+      stateStore: {
+        load: async () => null,
+        save: () => new Promise((_, reject) => setTimeout(() => reject(new Error("late")), 60)),
+      },
+      stateSaveTimeoutMs: 10,
+    });
+
+    await startAndStop(scheduler);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+
+  assert.deepEqual(unhandled, []);
 });

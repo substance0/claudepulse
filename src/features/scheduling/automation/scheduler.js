@@ -71,6 +71,9 @@ function isUnrecoverableAuthError(error) {
   return namesAuthProblem || rejectedByStatus;
 }
 
+/** How long scheduling waits for the state file to be written. */
+const STATE_SAVE_TIMEOUT_MS = 5000;
+
 /** Unrecognised rate-limit fields whose values describe the account's billing. */
 const BILLING_FIELDS = new Set([
   "canUserPurchaseCredits",
@@ -106,6 +109,7 @@ export class PulseScheduler {
    * @param {{nextAllowed: Function, isActive: Function}} [options.workHours] - Limits pulses to working hours
    * @param {{load: Function, save: Function}} [options.stateStore] - Persists the schedule across restarts
    * @param {string} [options.stateFingerprint] - Identifies the scheduling settings; a saved schedule made under other settings is not resumed
+   * @param {number} [options.stateSaveTimeoutMs] - How long to wait for a state write before moving on
    */
   constructor(options = {}) {
     // Validate required dependencies
@@ -125,6 +129,8 @@ export class PulseScheduler {
     this.workHours = options.workHours ?? null;
     this.stateStore = options.stateStore ?? null;
     this.stateFingerprint = options.stateFingerprint ?? "";
+    this.stateSaveTimeoutMs =
+      options.stateSaveTimeoutMs ?? STATE_SAVE_TIMEOUT_MS;
     // A saved pulse time to resume at startup, used once
     this.restoredNextPulseAt = null;
     this.logger = options.logger.child({
@@ -370,17 +376,31 @@ export class PulseScheduler {
     if (!this.stateStore) {
       return;
     }
+    // The wait is bounded: a write that hangs, on a stalled network volume
+    // for example, must not keep the next pulse from being scheduled.
+    let timer;
+    const noAnswer = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`no answer after ${this.stateSaveTimeoutMs} ms`)),
+        this.stateSaveTimeoutMs,
+      );
+    });
     try {
-      await this.stateStore.save({
-        nextPulseAt,
-        rateLimit: this.rateLimit,
-        strategy,
-        fingerprint: this.stateFingerprint,
-      });
+      await Promise.race([
+        this.stateStore.save({
+          nextPulseAt,
+          rateLimit: this.rateLimit,
+          strategy,
+          fingerprint: this.stateFingerprint,
+        }),
+        noAnswer,
+      ]);
     } catch (error) {
       this.logger.warn("schedule", "Could not save state", {
         error: error.message,
       });
+    } finally {
+      clearTimeout(timer);
     }
   }
 

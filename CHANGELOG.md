@@ -1,3 +1,19 @@
+# [2.7.0](https://github.com/substance0/claudepulse/compare/v2.6.0...v2.7.0) (2026-10-05)
+
+
+### Bug Fixes
+
+* keep the webhook URL out of Discord delivery failure logs ([f92d309](https://github.com/substance0/claudepulse/commit/f92d3095c89c3177c476b2b12917bceae81af1a8))
+* name the notifier when Discord refuses a post ([633aa08](https://github.com/substance0/claudepulse/commit/633aa087d0dfe11580eb6b825bcb3d00c9b5daa2))
+* post extra usage once when both webhooks are the same URL ([fb6fa4e](https://github.com/substance0/claudepulse/commit/fb6fa4e8c4b95e0d41edc77a534b9c7101cfc7c4))
+* stop promising one credit pulse per blocked period ([95518ef](https://github.com/substance0/claudepulse/commit/95518ef9f9d574d9fb515ea35071ac351eb57e47))
+
+
+### Features
+
+* alert on the errors webhook when a pulse ran on paid extra usage ([e90eeb3](https://github.com/substance0/claudepulse/commit/e90eeb3fed738c53a8bb56b6ec003ceead34aad4))
+* rename the errors webhook setting to DISCORD_ERROR_WEBHOOK_URL ([a1abdae](https://github.com/substance0/claudepulse/commit/a1abdaedebe3fa5a46f8ad3dabf366f62cbeded2))
+
 # [2.6.0](https://github.com/substance0/claudepulse/compare/v2.5.0...v2.6.0) (2026-10-04)
 
 

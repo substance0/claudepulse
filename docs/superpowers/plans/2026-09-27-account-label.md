@@ -125,7 +125,7 @@ git commit -m "feat: read and validate an optional ACCOUNT_LABEL"
 
 **Interfaces:**
 - Consumes: nothing from Task 1 directly (label passed as an option).
-- Produces: `new Logger({ label })`; `logger.label: string | undefined`; prefix `[TIMESTAMP] [LEVEL] [label] [CATEGORY]`; error alert title `🚨 <service> (<label>) Error`.
+- Produces: `new Logger({ label })`; `logger.label: string | undefined`; prefix `[TIMESTAMP] [LEVEL] [label] [CATEGORY]`; error alert title `<service> (<label>) Error`.
 
 - [ ] **Step 1: Write the failing tests** (`test/logger.label.test.js`)
 
@@ -181,14 +181,14 @@ test("error alerts name the account", async (t) => {
   await new Promise((resolve) => setImmediate(resolve));
 
   // Assert
-  assert.equal(posted[0].embeds[0].title, "🚨 claudepulse (work) Error");
+  assert.equal(posted[0].embeds[0].title, "claudepulse (work) Error");
 });
 ```
 
 - [ ] **Step 2: Run to verify they fail**
 
 Run: `node --test test/logger.label.test.js`
-Expected: FAIL on the prefix (`[work]` missing), `child.label` undefined, and the title `🚨 claudepulse Error`.
+Expected: FAIL on the prefix (`[work]` missing), `child.label` undefined, and the title `claudepulse Error`.
 
 - [ ] **Step 3: Implement**
 
@@ -209,8 +209,8 @@ In `error`, replace the alert title:
 
 ```js
           title: this.label
-            ? `🚨 ${this.service} (${this.label}) Error`
-            : `🚨 ${this.service} Error`,
+            ? `${this.service} (${this.label}) Error`
+            : `${this.service} Error`,
 ```
 
 In `child`, add to the `new Logger({...})` options:
@@ -398,7 +398,7 @@ Section:
 **Default:** Unset (no label)
 
 When set, log lines read `[INFO] [work] [PULSE] …`, error alerts are titled
-`🚨 claudepulse (work) Error`, and window notifications `work · Window open`.
+`claudepulse (work) Error`, and window notifications `work · Window open`.
 
 ```bash
 ACCOUNT_LABEL=work

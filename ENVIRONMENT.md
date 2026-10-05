@@ -534,7 +534,7 @@ reset time is visible from a phone.
 **Default:** Unset (no label)
 
 When set, log lines read `[INFO] [work] [PULSE] …`, error alerts are titled
-`🚨 claudepulse (work) Error`, and window notifications `work · Window open`.
+`claudepulse (work) Error`, and window notifications `work · Window open`.
 
 ```bash
 ACCOUNT_LABEL=work

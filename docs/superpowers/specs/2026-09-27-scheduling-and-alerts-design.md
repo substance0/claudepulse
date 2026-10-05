@@ -47,7 +47,7 @@ Several accounts run as one container each, each with its own
 - New optional setting `ACCOUNT_LABEL` (1–32 characters: letters, digits,
   space, `.`, `_`, `-`).
 - When set, every log line shows `[<label>]` after the level, error alerts are
-  titled `🚨 claudepulse (<label>) Error`, and window notifications are titled
+  titled `claudepulse (<label>) Error`, and window notifications are titled
   `<label> · <title>`.
 - README gains a "Several Accounts" section with a two-service compose
   example (distinct `container_name`, env file and `ACCOUNT_LABEL`).

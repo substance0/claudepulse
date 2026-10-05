@@ -174,7 +174,7 @@ For development setup, tests and the release process, see [CONTRIBUTING.md](CONT
 ```bash
 docker logs -f claudepulse
 # [INFO] [PULSE] Pulse successful (window_resets=…, weekly=20%, cost=…)
-# [INFO] [STRATEGY] ✓ Strategy selected: window_reset → scheduling next pulse at …
+# [INFO] [STRATEGY] Strategy selected: window_reset → scheduling next pulse at …
 ```
 
 `docker ps` also shows a health status. It checks that Node.js and the Claude CLI run, not that pulses succeed; failed pulses show up in the logs and in Discord alerts.

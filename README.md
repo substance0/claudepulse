@@ -195,7 +195,7 @@ To set one up:
    ```
 3. **Recreate the container** so it reads the new value, as for an upgrade.
 
-See [ENVIRONMENT.md](ENVIRONMENT.md#discord_webhook_url) to send a test alert.
+See [ENVIRONMENT.md](ENVIRONMENT.md#discord_error_webhook_url) to send a test alert.
 
 ### Several Accounts
 

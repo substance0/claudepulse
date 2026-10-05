@@ -28,22 +28,23 @@ Claude's 5-hour windows don't start on their own when the previous one resets. A
 | ------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | **9:00 AM**  | Start coding, excited about your project                                  | Start coding, excited about your project                                  |
 | **11:00 AM** | _"5-hour limit reached • resets 2pm"_                                     | _"5-hour limit reached • resets 2pm"_                                     |
-| **2:00 PM**  | Reset time arrives, but you're in meetings                                | Reset time arrives, but you're in meetings                                |
-| **2:10 PM**  | Still in meetings...                                                      | **ClaudePulse sends a pulse automatically**                               |
+| **2:00 PM**  | Reset time arrives, but you're in meetings                                | Reset time arrives, and **ClaudePulse sends a pulse 10 seconds later**    |
 | **4:00 PM**  | Ready to code, but the window starts NOW<br>_(Lost 2 hours you paid for)_ | Ready to code with **3h remaining**<br>_(Maximum subscription value)_     |
 
 ## Quick Start
 
-You need a Claude Pro or Max account, and Docker (or Podman) on a machine that stays on: a NAS, a Raspberry Pi, a small server.
+You need a Claude Pro or Max account, and Docker (or Podman) on a machine that stays on: a NAS, a Raspberry Pi with a 64-bit OS, a small server. To create the token you also need the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview), once, on any machine with a browser.
 
 ```bash
-claude setup-token   # on any machine with a browser; prints a token valid for one year
-echo "CLAUDE_CODE_OAUTH_TOKEN=<token>" > claudepulse.env && chmod 600 claudepulse.env
+claude setup-token   # prints a token valid for one year
+read -rs CP_TOKEN && (umask 077 && printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$CP_TOKEN" > claudepulse.env) && unset CP_TOKEN   # paste the token, press Enter
 docker run -d --name claudepulse --restart unless-stopped \
   -e TZ=America/New_York --env-file claudepulse.env \
-  ghcr.io/substance0/claudepulse:latest
+  ghcr.io/substance0/claudepulse:latest   # set TZ to your own time zone
 docker logs -f claudepulse   # watch the first pulse
 ```
+
+The `read` line takes the token without echoing it or saving it in your shell history, and creates `claudepulse.env` readable only by you.
 
 That is all: ClaudePulse pulses right away, then follows each window's reset. [Installation](#installation) explains each step and covers Docker Compose and running from source; [Configuration](#configuration) covers work hours and Discord notifications.
 
@@ -51,14 +52,14 @@ That is all: ClaudePulse pulses right away, then follows each window's reset. [I
 
 1. **A pulse** runs Claude Code once (`claude -p`) on the cheapest model, with thinking disabled, no tools, a one-line system prompt and an isolated configuration, so it is a single short call and costs as little as possible.
 2. **Claude Code reports when the current window resets.** ClaudePulse schedules the next pulse just after that time, so one pulse per window is enough.
-3. **At startup**, ClaudePulse pulses right away to learn the current window, or waits for `SCHEDULED_START_HOUR` if you set one. Until a window is known, it pulses hourly. With `STATE_DIR` set, a restart or an upgrade resumes the pulse it had planned instead of pulsing again.
+3. **At startup**, ClaudePulse pulses right away to learn the current window (`IMMEDIATE_PULSE_AFTER_AUTH=false` skips it). If you set `SCHEDULED_START_HOUR`, the first scheduled pulse lands at that hour instead of following the window. Until a window is known, it pulses hourly. With `STATE_DIR` set, a restart or an upgrade resumes the pulse it had planned instead of pulsing again.
 4. **Work hours** (opt-in, `WORK_HOURS_ENABLED=true`): the first pulse of each working day lands so the window has the hours you choose left when you start, and a fresh window follows soon after. No pulse is sent at night, on days off, or at startup outside these hours.
 
 See the [workflow diagrams](docs/workflow-diagrams.md) for the full scheduling logic.
 
-### Work Hours: Two Budgets Before Lunch
+### Work Hours: Two Budgets in the Morning
 
-Say you start at 09:00. Without work hours, your first prompt opens a window that closes at 14:00. With `WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, the first pulse fires at 06:00:10, so at 09:00 that window has 2 hours left, and a fresh one opens at 11:00:
+A window is one usage budget: it lasts 5 hours from the pulse or prompt that opens it. Say you start at 09:00. Without ClaudePulse, your first prompt opens a window that closes at 14:00. ClaudePulse alone keeps windows chained around the clock, but 24 hours is not a multiple of 5, so the hours left when you sit down change from day to day. Work hours anchor the chain to your day. With `WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, the first pulse of the day fires at 06:00:10, so at 09:00 that window has 2 hours left, and a fresh one opens at 11:00:
 
 ```mermaid
 gantt
@@ -67,6 +68,7 @@ gantt
     axisFormat %H:%M
     section Without ClaudePulse
     Window opened by your first prompt :a1, 09:00, 5h
+    Next window opens when you prompt again :a2, 14:00, 5h
     section With work hours
     Window 1 opened by the first pulse :b1, 06:00, 5h
     Window 2 opened by the next pulse :b2, 11:00, 5h
@@ -75,7 +77,7 @@ gantt
     You start working :milestone, m1, 09:00, 0m
 ```
 
-You get two budgets before 14:00 instead of one: the last 2 hours of window 1, then all of window 2. The settings for this example:
+The bar for the next window shows the earliest it can start: it opens only when you prompt again. With work hours you get two budgets before 14:00 instead of one: the last 2 hours of window 1, then all of window 2. This needs `HOURS_LEFT_AT_START` below 5; at the default of 5 you start the day with a full window. The settings for this example:
 
 ```bash
 WORK_HOURS_ENABLED=true
@@ -92,7 +94,7 @@ WORK_DAYS=Mon-Fri
 | Feature                       | Description                                                                                                                         |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **Window-Aware Scheduling**   | Follows the reported window reset, waits out usage limits, and respects a configured start hour ([strategies](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
-| **Work Hours** (opt-in)       | Starts your working day with a window that has the hours you choose left, so the morning gets two budgets; no pulses at night or on days off ([how](#work-hours-two-budgets-before-lunch)) |
+| **Work Hours** (opt-in)       | Starts your working day with a window that has the hours you choose left, so the morning can get two budgets; no pulses at night or on days off ([how](#work-hours-two-budgets-in-the-morning)) |
 | **Resume After Restart**      | With `STATE_DIR`, a restart or an upgrade resumes the planned pulse instead of sending a new one                                      |
 | **Window Notifications**      | Optional Discord message each time a window opens (with weekly usage) or a 5-hour or weekly limit is reached, with reset times in your local time zone |
 | **Extra Usage Alert**         | Tells you, in the log and on Discord, when a pulse ran on paid extra usage credits                                                   |
@@ -107,19 +109,19 @@ WORK_DAYS=Mon-Fri
 
 All installation paths read secrets from a `claudepulse.env` file. Create it once.
 
-**1. Generate a token** on any machine with a browser. It is valid for one year:
+**1. Generate a token** with the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview), on any machine with a browser. It is valid for one year:
 
 ```bash
 claude setup-token
 ```
 
-**2. Store it in `claudepulse.env`**, readable only by you. The command prints the token once and saves it nowhere:
+**2. Store it in `claudepulse.env`**, readable only by you. The previous command prints the token once and saves it nowhere; paste it when this one waits for input:
 
 ```bash
-echo "CLAUDE_CODE_OAUTH_TOKEN=<token>" > claudepulse.env && chmod 600 claudepulse.env
+read -rs CP_TOKEN && (umask 077 && printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$CP_TOKEN" > claudepulse.env) && unset CP_TOKEN
 ```
 
-The env file keeps the token out of your shell history and compose files. Docker still copies its values into the container configuration, so anyone who can run `docker inspect` on the host can read it.
+The `read` command keeps the token out of your shell history, and the env file keeps it out of compose files. Docker still copies its values into the container configuration, so anyone who can run `docker inspect` on the host can read it.
 
 <details open>
 <summary><strong>Docker (Recommended)</strong></summary>
@@ -131,7 +133,7 @@ docker run -d --name claudepulse --restart unless-stopped \
   ghcr.io/substance0/claudepulse:latest
 ```
 
-Set `TZ` to your [time zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) so log timestamps match your clock (default `UTC`). Podman works the same way: replace `docker` with `podman`.
+Set `TZ` to your [time zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) so log timestamps and work hours match your clock (the container defaults to `UTC`). To resume the planned pulse after a restart or an upgrade, also pass `-e STATE_DIR=/data -v claudepulse-data:/data`. Podman accepts the same commands: replace `docker` with `podman`. Rootless Podman needs `podman-restart.service` or a Quadlet for `--restart` to survive a reboot.
 
 </details>
 
@@ -224,7 +226,7 @@ The ones most setups touch:
 
 | Variable                     | Default       | Description                                                            |
 | ---------------------------- | ------------- | ---------------------------------------------------------------------- |
-| `SCHEDULED_START_HOUR`       | unset         | Hour (0-23) of a single first pulse; later pulses follow the window. Not with work hours on |
+| `SCHEDULED_START_HOUR`       | unset         | Hour (0-23) of the first scheduled pulse, after the startup pulse; later pulses follow the window. Not with work hours on |
 | `IMMEDIATE_PULSE_AFTER_AUTH` | `true`        | Pulse at startup to learn the current window                           |
 | `PROMPT_TEXT`                | `pulse check` | Message each pulse sends to Claude                                     |
 | `MAX_RETRIES`                | `3`           | Maximum retry attempts on failure                                      |
@@ -298,7 +300,7 @@ Both can share Discord webhooks: every message names its account. If you enable 
 
 **What is "extra usage"?** If your account allows paid extra usage and a limit is reached, Claude Code carries on with credits, and a pulse sent then is billed. ClaudePulse never skips a pulse over it; it tells you with a `Pulse ran on paid extra usage` warning in the log and an "Extra usage in use" message on Discord. The next pulse is planned for when the limit lifts, but a restart without `STATE_DIR`, or the first pulse at `SCHEDULED_START_HOUR`, can add one more before then.
 
-**Is my token safe?** It is read from the environment and masked as `[REDACTED]` in the configuration log, and `claudepulse.env` keeps it out of compose files and shell history. Anyone who can run `docker inspect` on the host can still read it, so keep that host private and renew the token every year.
+**Is my token safe?** ClaudePulse never reads, logs or stores the token: it stays in the container's environment, where the Claude CLI picks it up for each pulse. The `claudepulse.env` file keeps it out of compose files, and entering it with `read -rs` keeps it out of your shell history. Anyone who can run `docker inspect` on the host can still read it, so keep that host private and renew the token every year.
 
 **Where should it run?** Anywhere that stays on: a NAS, a Raspberry Pi (the images are built for `arm64`), a small server. It needs no Claude login on the machine, only the token.
 

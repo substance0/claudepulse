@@ -111,7 +111,8 @@ WORK_DAYS=Mon-Fri
 **Recommended:** 1-50 characters for minimal token usage
 
 Every pulse also carries a one-line system prompt (`Reply with the single word
-ok.`) and no tools, so the reply stays one word whatever this message says.
+ok.`) and no tools, so whatever this message says, a pulse is a single model
+call whose reply is normally one word.
 
 **Examples:**
 

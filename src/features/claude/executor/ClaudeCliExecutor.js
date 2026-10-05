@@ -7,8 +7,8 @@ const PULSE_MODEL = "haiku";
  * System prompt of a pulse. With no tools and this line a pulse is a single
  * model call of a few hundred tokens, where the CLI's own prompt and tools can
  * make it several calls over tens of thousands of input tokens. The two go
- * together: a custom prompt that keeps the tool definitions still pays for
- * writing them.
+ * together: a custom prompt that keeps the tool definitions pays to write them
+ * to the prompt cache on every pulse.
  */
 const PULSE_SYSTEM_PROMPT = "Reply with the single word ok.";
 

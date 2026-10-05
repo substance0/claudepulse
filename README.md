@@ -140,7 +140,7 @@ docker rm -f claudepulse   # then run the `docker run` command above again
 docker compose pull && docker compose up -d   # with Docker Compose
 ```
 
-**Renew the token** before it expires, one year after `claude setup-token`. An expired token makes every pulse fail with an authentication error, and it is not retried. Run `claude setup-token` again, replace the token in `claudepulse.env`, update `TOKEN_EXPIRES_AT` if you set it, then recreate the container as for an upgrade. Set `TOKEN_EXPIRES_AT` to the date one year after `claude setup-token` to be warned on Discord 14, 7 and 1 day before, and once it has expired.
+**Renew the token** before it expires, one year after `claude setup-token`. An expired token makes every pulse fail with an authentication error, and it is not retried. Run `claude setup-token` again, replace the token in `claudepulse.env`, update `TOKEN_EXPIRES_AT` if you set it, then recreate the container as for an upgrade. Set `TOKEN_EXPIRES_AT` to the date one year after `claude setup-token` to be warned on Discord 14, 7 and 1 day before, and once it has expired. If "Token rejected" appears right after an upgrade, with a token that has not expired, read the CLI's own error in `docker logs claudepulse` before renewing it: a refusal of the options a pulse runs with is reported the same way.
 
 **Stop** ClaudePulse with `docker rm -f claudepulse`, or `docker compose down`.
 

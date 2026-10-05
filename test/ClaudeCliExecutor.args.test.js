@@ -49,10 +49,13 @@ test("replaces the system prompt with a one-line instruction to answer one word"
   assert.ok(!args.includes("--append-system-prompt"));
 });
 
-test("a flag follows --tools, so its value list never reaches the prompt", () => {
+test("--tools takes one value, the empty list, before the next flag", () => {
+  // The option accepts several values, so anything after it that is not a flag
+  // would be read as a tool name
   const args = ClaudeCliExecutor.buildArgs("pulse check");
-  const next = args[args.indexOf("--tools") + 2];
-  assert.match(next, /^--/);
+  const start = args.indexOf("--tools") + 1;
+  const end = args.findIndex((arg, i) => i >= start && arg.startsWith("--"));
+  assert.deepEqual(args.slice(start, end), [""]);
 });
 
 test("passes the prompt text as the -p value", () => {

@@ -31,6 +31,40 @@ async function writeEnvProbe(dir, varName = "MAX_THINKING_TOKENS") {
   return { binary: file, out };
 }
 
+/** Write a stub that records each argument it received, one per bracketed line. */
+async function writeArgvProbe(dir) {
+  const out = path.join(dir, "argv-probe.txt");
+  const file = path.join(dir, "probe-claude-argv");
+  await fs.writeFile(
+    file,
+    `#!/bin/sh\nfor arg in "$@"; do printf '[%s]\\n' "$arg"; done > ${out}\necho '{}'\n`,
+  );
+  await fs.chmod(file, 0o755);
+  return { binary: file, out };
+}
+
+test("hands the binary exactly the argument list, empty values included", async () => {
+  // Arrange
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "cp-exec-"));
+  const { binary, out } = await writeArgvProbe(dir);
+  const executor = new ClaudeCliExecutor({
+    logger: NOOP_LOGGER,
+    cwd: dir,
+    binary,
+  });
+
+  // Act
+  await executor.pulse("pulse check");
+
+  // Assert - a shell would drop the empty --tools value, and the CLI would
+  // then read --system-prompt as a tool name
+  const received = (await fs.readFile(out, "utf8")).trimEnd().split("\n");
+  assert.deepEqual(
+    received,
+    ClaudeCliExecutor.buildArgs("pulse check").map((arg) => `[${arg}]`),
+  );
+});
+
 test("returns a successful result from the CLI's JSON output", async () => {
   // Arrange
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "cp-exec-"));

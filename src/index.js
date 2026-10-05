@@ -136,12 +136,15 @@ async function runScheduler(config, logger) {
     : undefined;
 
   // Extra usage is spending: it also goes to the errors webhook, which is not
-  // meant to be muted like the window channel.
-  const alerter = config.DISCORD_ERROR_WEBHOOK_URL
-    ? createExtraUsageAlerter(config.DISCORD_ERROR_WEBHOOK_URL, {
-        label: config.ACCOUNT_LABEL,
-      })
-    : undefined;
+  // meant to be muted like the window channel. When both settings name the
+  // same webhook, the window notifier already delivers it there.
+  const alerter =
+    config.DISCORD_ERROR_WEBHOOK_URL &&
+    config.DISCORD_ERROR_WEBHOOK_URL !== config.DISCORD_WINDOW_WEBHOOK_URL
+      ? createExtraUsageAlerter(config.DISCORD_ERROR_WEBHOOK_URL, {
+          label: config.ACCOUNT_LABEL,
+        })
+      : undefined;
 
   const scheduler = new PulseScheduler({
     executor,

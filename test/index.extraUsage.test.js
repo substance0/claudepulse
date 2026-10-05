@@ -52,10 +52,18 @@ function rateLimitEvent(info) {
   return { type: "rate_limit_event", rate_limit_info: info, uuid: "u", session_id: "s" };
 }
 
-test("a pulse that ran on extra usage reaches the errors webhook, the window webhook and the log", async (t) => {
-  // Arrange: the weekly limit is reached, and the CLI reports the pulse ran on credits
+/**
+ * A PATH holding the fake `claude` and the system directories its script
+ * needs, and nothing else, so a real CLI installed elsewhere is never found.
+ */
+function pathWith(bin) {
+  return [bin, "/usr/bin", "/bin"].join(path.delimiter);
+}
+
+/** A fake `claude` reporting that the weekly limit is reached and the pulse ran on credits. */
+function creditsClaude(t) {
   const lift = Math.floor(Date.now() / 1000) + 72 * HOUR_S;
-  const bin = await fakeClaude(t, [
+  return fakeClaude(t, [
     rateLimitEvent({
       status: "rejected",
       resetsAt: lift,
@@ -66,11 +74,16 @@ test("a pulse that ran on extra usage reaches the errors webhook, the window web
     }),
     RESULT,
   ]);
+}
+
+test("a pulse that ran on extra usage reaches the errors webhook, the window webhook and the log", async (t) => {
+  // Arrange: the weekly limit is reached, and the CLI reports the pulse ran on credits
+  const bin = await creditsClaude(t);
   const discord = await startFakeDiscord(t);
 
   // Act: the real app runs its startup pulse against the fake CLI
   const output = await runUntilStopped({
-    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    PATH: pathWith(bin),
     IMMEDIATE_PULSE_AFTER_AUTH: "true",
     DISCORD_ERROR_WEBHOOK_URL: `${discord.base}/errors`,
     DISCORD_WINDOW_WEBHOOK_URL: `${discord.base}/window`,
@@ -84,6 +97,22 @@ test("a pulse that ran on extra usage reaches the errors webhook, the window web
   assert.equal(discord.posted.window[0].title, "Extra usage in use");
   assert.match(output, /\[WARN\] \[PULSE\] Pulse ran on paid extra usage \(limit=weekly\)/);
   assert.match(output, /overage=on/);
+});
+
+test("with one webhook for both settings, extra usage is posted there once", async (t) => {
+  const bin = await creditsClaude(t);
+  const discord = await startFakeDiscord(t);
+  const shared = `${discord.base}/errors`;
+
+  const output = await runUntilStopped({
+    PATH: pathWith(bin),
+    IMMEDIATE_PULSE_AFTER_AUTH: "true",
+    DISCORD_ERROR_WEBHOOK_URL: shared,
+    DISCORD_WINDOW_WEBHOOK_URL: shared,
+  });
+
+  assert.equal(discord.posted.errors.length, 1, output);
+  assert.equal(discord.posted.errors[0].title, "Extra usage in use");
 });
 
 test("an ordinary pulse posts to the window webhook only", async (t) => {
@@ -103,7 +132,7 @@ test("an ordinary pulse posts to the window webhook only", async (t) => {
   const discord = await startFakeDiscord(t);
 
   const output = await runUntilStopped({
-    PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+    PATH: pathWith(bin),
     IMMEDIATE_PULSE_AFTER_AUTH: "true",
     DISCORD_ERROR_WEBHOOK_URL: `${discord.base}/errors`,
     DISCORD_WINDOW_WEBHOOK_URL: `${discord.base}/window`,

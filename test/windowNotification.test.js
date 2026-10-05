@@ -383,6 +383,15 @@ test("the alerter posts an extra usage pulse to its webhook, labelled", async ()
   assert.equal(sent[0].payload.title, "work · Extra usage in use");
 });
 
+test("a notifier fails when Discord refuses its post, so the failure can be attributed", async () => {
+  const refuse = async () => false;
+  const windowNotifier = createWindowNotifier("https://discord.test/window", { send: refuse });
+  const alerter = createExtraUsageAlerter("https://discord.test/errors", { send: refuse });
+
+  await assert.rejects(windowNotifier.notify(allowedPulse()), /Discord did not accept/);
+  await assert.rejects(alerter.notify(extraUsagePulse()), /Discord did not accept/);
+});
+
 test("the alerter stays silent for ordinary pulses and limit messages", async () => {
   const sent = [];
   const alerter = createExtraUsageAlerter("https://discord.test/errors", {

@@ -129,7 +129,9 @@ export function buildWindowNotification(pulseResult) {
   }
 
   // The pulse ran, on credits: the limit message would wrongly say that
-  // pulsing resumes when the limit lifts.
+  // pulsing resumes when the limit lifts. A CLI that reports credit use
+  // without a rejected limit also lands here, so "Window open" gives way to
+  // this message for that pulse.
   const extraUsage = buildExtraUsageNotification(pulseResult);
   if (extraUsage) {
     return extraUsage;
@@ -176,7 +178,9 @@ export function buildWindowNotification(pulseResult) {
  * @param {string} webhookUrl - Discord webhook
  * @param {{send?: Function, label?: string}} [options] - Discord sender
  *   (overridable in tests) and the account label prefixed to titles
- * @returns {{notify: (pulseResult: Object) => Promise<void>}}
+ * @returns {{notify: (pulseResult: Object) => Promise<void>}} `notify`
+ *   rejects when Discord does not accept the post, so the caller can say
+ *   which notifier failed
  */
 function createNotifier(
   build,
@@ -190,7 +194,9 @@ function createNotifier(
         return;
       }
       const title = label ? `${label} · ${payload.title}` : payload.title;
-      await send({ ...payload, title }, webhookUrl);
+      if ((await send({ ...payload, title }, webhookUrl)) === false) {
+        throw new Error("Discord did not accept the message");
+      }
     },
   };
 }

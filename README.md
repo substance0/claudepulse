@@ -1,6 +1,3 @@
-> [!NOTE]
-> This is a personal project I’m using to learn and experiment (with some AI help). It’s not really maintained, doesn’t have a roadmap, and comes with no guarantees—use at your own risk.
-
 <div align="center">
 
 <img src="assets/logo.png" alt="ClaudePulse Logo" width="250">
@@ -14,7 +11,7 @@
 [![Version](https://img.shields.io/github/v/release/substance0/claudepulse)](https://github.com/substance0/claudepulse/releases)
 [![Docker Edge](https://github.com/substance0/claudepulse/actions/workflows/docker-edge.yml/badge.svg)](https://github.com/substance0/claudepulse/actions/workflows/docker-edge.yml)
 
-[How It Works](#how-it-works) • [Installation](#installation) • [Operating](#operating) • [Configuration](#configuration) • [Image Tags](#image-tags) • [Support](#support) • [License](#license)
+[Quick Start](#quick-start) • [How It Works](#how-it-works) • [Features](#features) • [Installation](#installation) • [Operating](#operating) • [Configuration](#configuration) • [FAQ](#faq-and-troubleshooting) • [Image Tags](#image-tags) • [Support](#support) • [License](#license)
 
 </div>
 
@@ -35,25 +32,76 @@ Claude's 5-hour windows don't start on their own when the previous one resets. A
 | **2:10 PM**  | 💼 Still in meetings...                                                  | ✅ **ClaudePulse sends pulse automatically**                             |
 | **4:00 PM**  | 😞 Ready to code, but window starts NOW<br>_(Lost 2 hours you paid for)_ | 😎 Ready to code with **3h remaining**<br>_(Maximum subscription value)_ |
 
+## Quick Start
+
+You need a Claude Pro or Max account, and Docker (or Podman) on a machine that stays on: a NAS, a Raspberry Pi, a small server.
+
+```bash
+claude setup-token   # on any machine with a browser; prints a token valid for one year
+echo "CLAUDE_CODE_OAUTH_TOKEN=<token>" > claudepulse.env && chmod 600 claudepulse.env
+docker run -d --name claudepulse --restart unless-stopped \
+  -e TZ=America/New_York --env-file claudepulse.env \
+  ghcr.io/substance0/claudepulse:latest
+docker logs -f claudepulse   # watch the first pulse
+```
+
+That is all: ClaudePulse pulses right away, then follows each window's reset. [Installation](#installation) explains each step and covers Docker Compose and running from source; [Configuration](#configuration) covers work hours and Discord notifications.
+
 ## How It Works
 
 1. **A pulse** runs Claude Code once (`claude -p`) on the cheapest model, with thinking disabled, no tools, a one-line system prompt and an isolated configuration, so it is a single short call and costs as little as possible.
 2. **Claude Code reports when the current window resets.** ClaudePulse schedules the next pulse just after that time, so one pulse per window is enough.
-3. **At startup**, ClaudePulse pulses right away to learn the current window, or waits for `SCHEDULED_START_HOUR` if you set one. Until a window is known, it pulses hourly.
-4. **Work hours** (opt-in, `WORK_HOURS_ENABLED=true`): with `WORK_START`, `WORK_END` and `HOURS_LEFT_AT_START`, the first pulse of each working day lands so the window has that many hours left when you start, and a fresh window follows soon after. No pulse is sent at night, on days off, or at startup outside these hours.
+3. **At startup**, ClaudePulse pulses right away to learn the current window, or waits for `SCHEDULED_START_HOUR` if you set one. Until a window is known, it pulses hourly. With `STATE_DIR` set, a restart or an upgrade resumes the pulse it had planned instead of pulsing again.
+4. **Work hours** (opt-in, `WORK_HOURS_ENABLED=true`): the first pulse of each working day lands so the window has the hours you choose left when you start, and a fresh window follows soon after. No pulse is sent at night, on days off, or at startup outside these hours.
 
 See the [workflow diagrams](docs/workflow-diagrams.md) for the full scheduling logic.
 
+### Work Hours: Two Budgets Before Lunch
+
+Say you start at 09:00. Without work hours, your first prompt opens a window that closes at 14:00. With `WORK_START=09:00` and `HOURS_LEFT_AT_START=2`, the first pulse fires at 06:00:10, so at 09:00 that window has 2 hours left, and a fresh one opens at 11:00:
+
+```mermaid
+gantt
+    title Windows around a 09:00 start, with 2 hours left at start
+    dateFormat HH:mm
+    axisFormat %H:%M
+    section Without ClaudePulse
+    Window opened by your first prompt :a1, 09:00, 5h
+    section With work hours
+    Window 1 opened by the first pulse :b1, 06:00, 5h
+    Window 2 opened by the next pulse :b2, 11:00, 5h
+    Window 3 :b3, 16:00, 5h
+    section You
+    You start working :milestone, m1, 09:00, 0m
+```
+
+You get two budgets before 14:00 instead of one: the last 2 hours of window 1, then all of window 2. The settings for this example:
+
+```bash
+WORK_HOURS_ENABLED=true
+WORK_START=09:00
+WORK_END=19:00
+HOURS_LEFT_AT_START=2
+WORK_DAYS=Mon-Fri
+```
+
+`WORK_END` is the last moment a window may _start_, not the time you stop working: a window opened before it runs its full 5 hours. If you also work late, in a separate session, set it later (see the [FAQ](#faq-and-troubleshooting)). [ENVIRONMENT.md](ENVIRONMENT.md#work-hours) has the details.
+
 ## Features
 
-| Feature                     | Description                                                                                                                         |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Window-Aware Scheduling** | Follows the reported window reset, waits out usage limits, and respects a configured start hour ([strategies](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
-| **Window Notifications**    | Optional Discord message each time a window opens (with weekly usage) or a 5-hour or weekly limit is reached, with reset times in your local time zone |
-| **Spaced Failure Alerts**   | Optional Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so an outage stays visible without flooding the channel |
-| **Retry with Backoff**      | Exponential backoff (configurable multiplier and maximum delay) for transient failures; authentication failures are not retried     |
-| **No Stored Credentials**   | Claude Code authenticates each pulse from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse keeps no credentials, and state only when `STATE_DIR` is set |
-| **Small, Verifiable Image** | No npm runtime dependencies, a pinned Claude Code CLI, `linux/amd64` and `linux/arm64` builds, and signed build provenance         |
+| Feature                       | Description                                                                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Window-Aware Scheduling**   | Follows the reported window reset, waits out usage limits, and respects a configured start hour ([strategies](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
+| **Work Hours** (opt-in)       | Starts your working day with a window that has the hours you choose left, so the morning gets two budgets; no pulses at night or on days off ([how](#work-hours-two-budgets-before-lunch)) |
+| **Resume After Restart**      | With `STATE_DIR`, a restart or an upgrade resumes the planned pulse instead of sending a new one                                      |
+| **Window Notifications**      | Optional Discord message each time a window opens (with weekly usage) or a 5-hour or weekly limit is reached, with reset times in your local time zone |
+| **Extra Usage Alert**         | Tells you, in the log and on Discord, when a pulse ran on paid extra usage credits                                                   |
+| **Token Expiry Warnings**     | Optional Discord warnings 14, 7 and 1 day before your token expires, and once it has                                                 |
+| **Spaced Failure Alerts**     | Optional Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so an outage stays visible without flooding the channel |
+| **Retry with Backoff**        | Exponential backoff (configurable multiplier and maximum delay) for transient failures; authentication failures are not retried     |
+| **Several Accounts**          | One container per account, each named in its log lines and Discord messages ([example](#several-accounts))                          |
+| **No Stored Credentials**     | Claude Code authenticates each pulse from `CLAUDE_CODE_OAUTH_TOKEN`; ClaudePulse keeps no credentials, and state only when `STATE_DIR` is set |
+| **Small, Verifiable Image**   | No npm runtime dependencies, a pinned Claude Code CLI, `linux/amd64` and `linux/arm64` builds, and signed build provenance         |
 
 ## Installation
 
@@ -131,7 +179,14 @@ docker logs -f claudepulse
 
 `docker ps` also shows a health status. It checks that Node.js and the Claude CLI run, not that pulses succeed; failed pulses show up in the logs and in Discord alerts.
 
-**Upgrade** to the latest release:
+> [!IMPORTANT]
+> **Coming from before v2.7.0?** `DISCORD_WEBHOOK_URL` is now `DISCORD_ERROR_WEBHOOK_URL`, and the old name is ignored. Rename it in `claudepulse.env` before you recreate the container, or failure alerts stop reaching Discord:
+>
+> ```bash
+> sed -i.bak 's/^DISCORD_WEBHOOK_URL=/DISCORD_ERROR_WEBHOOK_URL=/' claudepulse.env && rm claudepulse.env.bak
+> ```
+
+**Upgrade** to the latest release. With `STATE_DIR` set, the new container resumes the pulse the old one had planned:
 
 ```bash
 docker pull ghcr.io/substance0/claudepulse:latest
@@ -150,26 +205,36 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 
 ### Settings
 
+The ones most setups touch:
+
 | Variable                     | Default       | Description                                                            |
 | ---------------------------- | ------------- | ---------------------------------------------------------------------- |
 | `TZ`                         | `UTC`         | Time zone for logs, work hours and `SCHEDULED_START_HOUR`              |
-| `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
-| `TOKEN_EXPIRES_AT`           | unset         | Token expiry (`YYYY-MM-DD`); warnings 14, 7 and 1 day before, and once expired |
-| `STATE_DIR`                  | unset         | Absolute directory for a state file, so a restart resumes the planned pulse (mount a volume there, e.g. `/data`) |
 | `WORK_HOURS_ENABLED`         | `false`       | Turns work hours on (see [Work Hours](ENVIRONMENT.md#work-hours))       |
 | `WORK_START`                 | unset         | When your working day starts (`HH:MM`); required when enabled          |
 | `WORK_END`                   | unset         | No window starts at or after this time (`HH:MM`); required when enabled |
 | `HOURS_LEFT_AT_START`        | `5`           | Hours left in the window at `WORK_START` (1-5)                         |
 | `WORK_DAYS`                  | every day     | Working days, e.g. `Mon-Fri` or `Mon-Thu,Sat`                          |
+| `STATE_DIR`                  | unset         | Absolute directory for a state file, so a restart resumes the planned pulse (mount a volume there, e.g. `/data`) |
+| `TOKEN_EXPIRES_AT`           | unset         | Token expiry (`YYYY-MM-DD`); warnings 14, 7 and 1 day before, and once expired |
+| `ACCOUNT_LABEL`              | unset         | Name shown in log lines and Discord messages, to tell accounts apart   |
+
+<details>
+<summary><strong>Advanced settings</strong></summary>
+
+| Variable                     | Default       | Description                                                            |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------- |
 | `SCHEDULED_START_HOUR`       | unset         | Hour (0-23) of a single first pulse; later pulses follow the window. Not with work hours on |
-| `LOG_LEVEL`                  | `INFO`        | Logging verbosity (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)          |
-| `DRY_RUN`                    | `false`       | Print the schedule and exit without sending a pulse                    |
+| `IMMEDIATE_PULSE_AFTER_AUTH` | `true`        | Pulse at startup to learn the current window                           |
 | `PROMPT_TEXT`                | `pulse check` | Message each pulse sends to Claude                                     |
 | `MAX_RETRIES`                | `3`           | Maximum retry attempts on failure                                      |
 | `RETRY_BACKOFF_MULTIPLIER`   | `2`           | Exponential backoff multiplier                                         |
 | `MAX_BACKOFF_MINUTES`        | `30`          | Maximum retry delay in minutes                                         |
-| `IMMEDIATE_PULSE_AFTER_AUTH` | `true`        | Pulse at startup to learn the current window                           |
+| `LOG_LEVEL`                  | `INFO`        | Logging verbosity (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)          |
+| `DRY_RUN`                    | `false`       | Print the schedule and exit without sending a pulse                    |
 | `KEEP_PULSE_ON_FAILURE`      | `false`       | Keep the container running when the scheduler fails to start, for debugging |
+
+</details>
 
 ### Secrets (`claudepulse.env`)
 
@@ -225,6 +290,27 @@ services:
 
 Both can share Discord webhooks: every message names its account. If you enable `STATE_DIR`, give each container a volume of its own (for example `claudepulse-work-data` and `claudepulse-personal-data`): a state file belongs to one account.
 
+## FAQ and Troubleshooting
+
+**Does a pulse use my allowance?** Very little. A pulse is one short call on the cheapest model, with no tools and thinking off: a few hundred tokens, a few hundredths of a cent at API prices. Each pulse logs its `cost=`.
+
+**What if I work outside my work hours?** Nothing breaks: your first prompt opens a window yourself, as it would without ClaudePulse. `WORK_END` is the last moment a window may _start_, not the time you stop, so a window opened before it runs its full 5 hours. If you also work late in a separate session, set `WORK_END` later: with `09:00`, 2 hours left and `WORK_END=23:59`, a pulse at 21:00:10 opens a window that resets at 02:00, so a session that starts at midnight finds 2 hours left.
+
+**What is "extra usage"?** If your account allows paid extra usage and a limit is reached, Claude Code carries on with credits, and a pulse sent then is billed. ClaudePulse never skips a pulse over it; it tells you with a `Pulse ran on paid extra usage` warning in the log and an "Extra usage in use" message on Discord. The next pulse is planned for when the limit lifts, but a restart without `STATE_DIR`, or the first pulse at `SCHEDULED_START_HOUR`, can add one more before then.
+
+**Is my token safe?** It is read from the environment and masked as `[REDACTED]` in the configuration log, and `claudepulse.env` keeps it out of compose files and shell history. Anyone who can run `docker inspect` on the host can still read it, so keep that host private and renew the token every year.
+
+**Where should it run?** Anywhere that stays on: a NAS, a Raspberry Pi (the images are built for `arm64`), a small server. It needs no Claude login on the machine, only the token.
+
+| You see in the logs or on Discord | It means | What to do |
+| --------------------------------- | -------- | ---------- |
+| `Outside work hours - no startup pulse; the working day's first pulse is at …` | The container started outside your work hours | Nothing: it waits for the first pulse of the day |
+| `Token rejected - run claude setup-token, update claudepulse.env and recreate the container` | The token expired or was refused | Renew it; right after an upgrade, read the CLI's own error in the logs first |
+| Failure alerts stopped arriving after an upgrade | `DISCORD_WEBHOOK_URL` was renamed in v2.7.0 | Rename it to `DISCORD_ERROR_WEBHOOK_URL` in `claudepulse.env` |
+| `Resuming saved schedule` | `STATE_DIR` is set and the container resumed its planned pulse | Nothing: this is the intended behaviour |
+| `Unrecognised rate-limit fields` | Claude Code reports a field ClaudePulse does not know yet | Harmless; open an issue with the line (billing values are masked) |
+| `Pulse ran on paid extra usage` | A limit was reached and the pulse used credits | See "What is extra usage?" above |
+
 ## Image Tags
 
 Images are published to `ghcr.io/substance0/claudepulse` for `linux/amd64` and `linux/arm64`.
@@ -253,6 +339,10 @@ Branch snapshots and release rebuilds are covered in [CONTRIBUTING.md](CONTRIBUT
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, checks and release process.
+
+## Disclaimer
+
+ClaudePulse is a personal project, built to learn and experiment with some AI help. It comes with no guarantees, so use it at your own risk. It is independent of Anthropic and not endorsed by it; Claude is a trademark of Anthropic.
 
 ## License
 

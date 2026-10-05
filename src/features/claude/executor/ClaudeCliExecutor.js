@@ -4,6 +4,15 @@ import { spawn } from "node:child_process";
 const PULSE_MODEL = "haiku";
 
 /**
+ * System prompt of a pulse. With no tools and this line a pulse is a single
+ * model call of a few hundred tokens, where the CLI's own prompt and tools can
+ * make it several calls over tens of thousands of input tokens. The two go
+ * together: a custom prompt that keeps the tool definitions still pays for
+ * writing them.
+ */
+const PULSE_SYSTEM_PROMPT = "Reply with the single word ok.";
+
+/**
  * Detect an authentication failure that retrying cannot resolve.
  * These need a human to re-authenticate, so further attempts only waste a
  * cycle. A credential is never validated up front, so this is the point at
@@ -253,6 +262,12 @@ export class ClaudeCliExecutor {
       promptText,
       "--model",
       PULSE_MODEL,
+      // An empty tool list. --tools takes several values, so a flag must
+      // follow it: the prompt sits right after -p, never after this option.
+      "--tools",
+      "",
+      "--system-prompt",
+      PULSE_SYSTEM_PROMPT,
       "--strict-mcp-config",
       "--settings",
       "{}",

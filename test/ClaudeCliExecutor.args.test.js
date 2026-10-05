@@ -34,10 +34,25 @@ test("never passes --bare, which would stop the CLI reading the OAuth token", ()
   assert.ok(!args.includes("--bare"));
 });
 
-test("never overrides the system prompt, which would void the prompt cache", () => {
+test("runs with no tools, so a pulse cannot start a multi-step session", () => {
   const args = ClaudeCliExecutor.buildArgs("pulse check");
-  assert.ok(!args.includes("--system-prompt"));
+  const i = args.indexOf("--tools");
+  assert.notEqual(i, -1);
+  assert.equal(args[i + 1], "");
+});
+
+test("replaces the system prompt with a one-line instruction to answer one word", () => {
+  const args = ClaudeCliExecutor.buildArgs("pulse check");
+  const i = args.indexOf("--system-prompt");
+  assert.notEqual(i, -1);
+  assert.equal(args[i + 1], "Reply with the single word ok.");
   assert.ok(!args.includes("--append-system-prompt"));
+});
+
+test("a flag follows --tools, so its value list never reaches the prompt", () => {
+  const args = ClaudeCliExecutor.buildArgs("pulse check");
+  const next = args[args.indexOf("--tools") + 2];
+  assert.match(next, /^--/);
 });
 
 test("passes the prompt text as the -p value", () => {

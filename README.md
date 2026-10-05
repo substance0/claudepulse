@@ -24,13 +24,13 @@ Claude's 5-hour windows don't start on their own when the previous one resets. A
 
 ### Real-World Scenario
 
-| Time         | Without ClaudePulse                                                      | With ClaudePulse                                                         |
-| ------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| **9:00 AM**  | 🚀 Start coding, excited about your project                              | 🚀 Start coding, excited about your project                              |
-| **11:00 AM** | 😱 _"5-hour limit reached • resets 2pm"_                                 | 😱 _"5-hour limit reached • resets 2pm"_                                 |
-| **2:00 PM**  | ⏰ Reset time arrives, but you're in meetings                            | ⏰ Reset time arrives, but you're in meetings                            |
-| **2:10 PM**  | 💼 Still in meetings...                                                  | ✅ **ClaudePulse sends pulse automatically**                             |
-| **4:00 PM**  | 😞 Ready to code, but window starts NOW<br>_(Lost 2 hours you paid for)_ | 😎 Ready to code with **3h remaining**<br>_(Maximum subscription value)_ |
+| Time         | Without ClaudePulse                                                       | With ClaudePulse                                                          |
+| ------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **9:00 AM**  | Start coding, excited about your project                                  | Start coding, excited about your project                                  |
+| **11:00 AM** | _"5-hour limit reached • resets 2pm"_                                     | _"5-hour limit reached • resets 2pm"_                                     |
+| **2:00 PM**  | Reset time arrives, but you're in meetings                                | Reset time arrives, but you're in meetings                                |
+| **2:10 PM**  | Still in meetings...                                                      | **ClaudePulse sends a pulse automatically**                               |
+| **4:00 PM**  | Ready to code, but the window starts NOW<br>_(Lost 2 hours you paid for)_ | Ready to code with **3h remaining**<br>_(Maximum subscription value)_     |
 
 ## Quick Start
 
@@ -122,7 +122,7 @@ echo "CLAUDE_CODE_OAUTH_TOKEN=<token>" > claudepulse.env && chmod 600 claudepuls
 The env file keeps the token out of your shell history and compose files. Docker still copies its values into the container configuration, so anyone who can run `docker inspect` on the host can read it.
 
 <details open>
-<summary><strong>🐳 Docker (Recommended)</strong></summary>
+<summary><strong>Docker (Recommended)</strong></summary>
 
 ```bash
 docker run -d --name claudepulse --restart unless-stopped \
@@ -136,7 +136,7 @@ Set `TZ` to your [time zone](https://en.wikipedia.org/wiki/List_of_tz_database_t
 </details>
 
 <details>
-<summary><strong>🐳 Docker Compose</strong></summary>
+<summary><strong>Docker Compose</strong></summary>
 
 Download the compose file next to `claudepulse.env`, then start it:
 
@@ -150,7 +150,7 @@ Settings go in `environment:`; secrets, including the optional Discord webhooks,
 </details>
 
 <details>
-<summary><strong>💻 From Source</strong></summary>
+<summary><strong>From Source</strong></summary>
 
 Requires Node.js 22 or later and the Claude CLI on your `PATH`. There are no runtime dependencies, so no `npm install` is needed to run it:
 

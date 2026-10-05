@@ -90,16 +90,16 @@ graph TD
 
     B --> C{"`**Outcome**`"}
 
-    C -->|"✓ Allowed"| D["`**Record Window**
+    C -->|"Allowed"| D["`**Record Window**
     _Reset failure count_`"]
 
     C -->|"Limit reached"| E["`**Record Blocking Reset**
     _Not a failure; no retry, no alert_`"]
 
-    C -->|"✗ Auth failure"| F["`**Fail Cycle**
+    C -->|"Auth failure"| F["`**Fail Cycle**
     _No retry: cannot succeed_`"]
 
-    C -->|"✗ Transient"| G{"`**Attempts Left?**`"}
+    C -->|"Transient"| G{"`**Attempts Left?**`"}
     G -->|"Yes"| H["`**Exponential Backoff**`"] --> B
     G -->|"No"| F
 

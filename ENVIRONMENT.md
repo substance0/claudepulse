@@ -492,7 +492,7 @@ which would also override the env file's value.
 docker exec claudepulse node -e "
 import('file:///app/src/core/services/notificationService.js').then(m => {
   m.sendDiscordAlert({
-    title: '🧪 Test Alert',
+    title: 'Test Alert',
     description: 'Testing Discord webhook',
     level: 'ERROR',
     fields: [{name: 'Status', value: 'Working!', inline: true}]
@@ -560,8 +560,8 @@ TZ=Australia/Sydney
 **Important:**
 
 - Use IANA identifiers (not UTC offsets) for automatic DST handling
-- ✅ Good: `TZ=America/New_York` (handles DST)
-- ❌ Bad: `TZ=UTC-5` (no DST adjustment)
+- Good: `TZ=America/New_York` (handles DST)
+- Bad: `TZ=UTC-5` (no DST adjustment)
 - `TZ` sets log timestamps and the hour `SCHEDULED_START_HOUR` refers to.
   Window reset times arrive as timestamps, so scheduling does not depend on it.
 
@@ -630,8 +630,8 @@ docker logs claudepulse 2>&1 | grep -i "windowResetsAt\|Pulse failed"
 
 ```bash
 # Use IANA timezone (handles DST automatically):
-TZ=America/New_York  # ✅ Auto-adjusts
-TZ=UTC-5            # ❌ No DST support
+TZ=America/New_York  # Auto-adjusts
+TZ=UTC-5             # No DST support
 
 # Verify during DST transition:
 docker logs claudepulse | grep -i "schedule\|next run"

@@ -162,9 +162,9 @@ gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
 
 ## Need Help?
 
-- 📖 Check the [documentation](README.md)
-- 🐛 [Report bugs](https://github.com/substance0/claudepulse/issues)
-- 💡 [Request features](https://github.com/substance0/claudepulse/issues)
+- Check the [documentation](README.md)
+- [Report bugs](https://github.com/substance0/claudepulse/issues)
+- [Request features](https://github.com/substance0/claudepulse/issues)
 
 ## Code of Conduct
 

@@ -305,6 +305,13 @@ test("announces a pulse that ran on paid extra usage because the weekly limit is
   assert.match(payload.description, new RegExp(`<t:${WEEK_EPOCH}:R>`));
 });
 
+test("does not promise when the next pulse runs", () => {
+  // A scheduled start hour or a restart can pulse before the limit lifts
+  const payload = buildExtraUsageNotification(extraUsagePulse());
+
+  assert.doesNotMatch(payload.description, /next pulse/i);
+});
+
 test("names the 5-hour limit when that is the one reached", () => {
   const payload = buildExtraUsageNotification(
     extraUsagePulse({ resetsAt: RESET, limitType: "five_hour", weekly: null }),

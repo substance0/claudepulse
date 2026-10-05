@@ -155,8 +155,10 @@ Claude CLI can also send `overageResetsAt`, `overageInUse`, `limitScope`,
 A successful pulse whose rate limit reports `overage.using === true` ran on
 paid extra usage: a limit is reached and the account allows extra usage. The
 report arrives after the pulse, so it cannot be undone; the scheduler already
-plans the next pulse for the blocking limit's reset, so at most one pulse per
-blocked period runs on credits (about 1.5 cents each).
+plans the next pulse for the blocking limit's reset, so a blocked period
+normally costs one pulse on credits (about 1.5 cents each). Two cases add
+another: the first pulse at `SCHEDULED_START_HOUR`, which outranks the window,
+and a restart without `STATE_DIR`, whose startup pulse runs again.
 
 - Each such pulse produces "Extra usage in use" (WARN): "This pulse ran on
   paid extra usage." plus, when a limit is reached, the limit's name (weekly
@@ -168,8 +170,8 @@ blocked period runs on credits (about 1.5 cents each).
 - A pulse that failed is not billed and is not announced this way.
 - No new setting, and no scheduling change: nothing is skipped. An
   "avoid credits" option was considered and dropped: it could only guess from
-  the previous event, and the exposure is a cent and a half per blocked
-  period.
+  the previous event, and the exposure is a cent and a half per pulse
+  that runs on credits.
 - The errors webhook setting is named `DISCORD_ERROR_WEBHOOK_URL` (formerly
   `DISCORD_WEBHOOK_URL`, whose old name is ignored).
 

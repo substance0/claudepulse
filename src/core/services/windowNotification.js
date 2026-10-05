@@ -106,7 +106,7 @@ export function buildExtraUsageNotification(pulseResult) {
           limit === "weekly"
             ? discordDateTime(rateLimit.resetsAt)
             : discordTime(rateLimit.resetsAt)
-        }; the next pulse follows then.`
+        }.`
       : "";
 
   return {

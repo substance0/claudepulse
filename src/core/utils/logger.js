@@ -431,8 +431,8 @@ export class Logger {
       sendDiscordAlert(
         {
           title: this.label
-            ? `🚨 ${this.service} (${this.label}) Error`
-            : `🚨 ${this.service} Error`,
+            ? `${this.service} (${this.label}) Error`
+            : `${this.service} Error`,
           description: message,
           level: "ERROR",
           fields,

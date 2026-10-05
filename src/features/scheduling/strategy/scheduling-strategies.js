@@ -210,7 +210,7 @@ class SchedulingStrategyManager {
         if (result) {
           context.logger?.info(
             "strategy",
-            `✓ Strategy selected: ${strategyName} → scheduling next pulse at ${DateUtility.formatLocalIso(result.time)}`,
+            `Strategy selected: ${strategyName} → scheduling next pulse at ${DateUtility.formatLocalIso(result.time)}`,
           );
           return result;
         }

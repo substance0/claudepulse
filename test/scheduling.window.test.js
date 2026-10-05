@@ -107,6 +107,18 @@ test("schedules from the window when a pulse reported one", async () => {
   assert.equal(result.time.getTime(), WINDOW_RESET.getTime() + BUFFER_MS);
 });
 
+test("logs the chosen strategy as plain text", async () => {
+  const messages = [];
+  const logger = { info: (_category, message) => messages.push(message) };
+
+  await new SchedulingStrategyManager().computeNextRunTime(
+    context({ rateLimit: ALLOWED, logger }),
+  );
+
+  const selected = messages.find((message) => message.includes("Strategy selected"));
+  assert.match(selected, /^Strategy selected: window_reset/);
+});
+
 test("falls back to hourly discovery when no window is known", async () => {
   const result = await new SchedulingStrategyManager().computeNextRunTime(
     context(),

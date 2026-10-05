@@ -49,5 +49,20 @@ test("error alerts name the account", async (t) => {
   await new Promise((resolve) => setImmediate(resolve));
 
   // Assert
-  assert.equal(posted[0].embeds[0].title, "🚨 claudepulse (work) Error");
+  assert.equal(posted[0].embeds[0].title, "claudepulse (work) Error");
+});
+
+test("error alerts without a label are titled with the service alone", async (t) => {
+  const posted = [];
+  t.mock.method(globalThis, "fetch", async (_url, init) => {
+    posted.push(JSON.parse(init.body));
+    return { ok: true };
+  });
+  const logger = new Logger({ discordWebhookUrl: WEBHOOK, enableColors: false });
+  t.mock.method(process.stderr, "write", () => true);
+
+  await logger.error("cycle", "All retry attempts exhausted");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(posted[0].embeds[0].title, "claudepulse Error");
 });

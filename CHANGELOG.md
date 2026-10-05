@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/substance0/claudepulse/compare/v2.7.0...v2.8.0) (2026-10-05)
+
+
+### Features
+
+* run pulses with no tools and a one-line system prompt ([5161d7e](https://github.com/substance0/claudepulse/commit/5161d7eb40512bc48f1cc660c7d791e3bb19871a))
+
 # [2.7.0](https://github.com/substance0/claudepulse/compare/v2.6.0...v2.7.0) (2026-10-05)
 
 

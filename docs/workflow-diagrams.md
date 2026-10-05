@@ -198,7 +198,7 @@ graph TD
     F -->|"No"| H["`**Done**`"]
 ```
 
-The pulse is built to cost as little as possible: `haiku`, thinking disabled, no MCP servers, no user settings, no session files, and the default system prompt so the prompt cache stays warm. Two options are deliberately never used: `--bare`, which stops the CLI reading `CLAUDE_CODE_OAUTH_TOKEN`, and a custom system prompt, which voids the cache and measured 3.8× more expensive.
+The pulse is built to cost as little as possible and to be a single short model call: `haiku`, thinking disabled, no tools, a one-line system prompt (`Reply with the single word ok.`), no MCP servers, no user settings and no session files. Two things are deliberately never done: `--bare`, which stops the CLI reading `CLAUDE_CODE_OAUTH_TOKEN`, and replacing the system prompt while keeping the tools, which measured 3.8× more expensive because the tool definitions then miss the prompt cache.
 
 ## 5. Failure Handling and Alerting
 

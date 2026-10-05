@@ -453,7 +453,8 @@ that reset, so a blocked period normally costs one such pulse. A pulse at
 `SCHEDULED_START_HOUR`, or a restart without `STATE_DIR` (the startup pulse
 runs again), can add another before the limit lifts. Nothing is skipped:
 ClaudePulse tells you; it does not decide for you. The same message replaces
-"Usage limit reached" on the window webhook for that pulse.
+"Usage limit reached" on the window webhook for that pulse; when both webhook
+settings name the same URL, it is posted there once.
 
 The webhook URL is masked as `[REDACTED]` in the startup configuration log, so
 it is not exposed to anyone reading container logs.

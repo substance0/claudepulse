@@ -150,31 +150,6 @@ Claude CLI can also send `overageResetsAt`, `overageInUse`, `limitScope`,
 - Telling the operator when a pulse ran on extra usage (T56) is built; skipping
   pulses to avoid it is not (see §7).
 
-## 7. Extra usage alert (T56)
-
-A successful pulse whose rate limit reports `overage.using === true` ran on
-paid extra usage: a limit is reached and the account allows extra usage. The
-report arrives after the pulse, so it cannot be undone; the scheduler already
-plans the next pulse for the blocking limit's reset, so a blocked period
-normally costs one pulse on credits (about 1.5 cents each). Two cases add
-another: the first pulse at `SCHEDULED_START_HOUR`, which outranks the window,
-and a restart without `STATE_DIR`, whose startup pulse runs again.
-
-- Each such pulse produces "Extra usage in use" (WARN): "This pulse ran on
-  paid extra usage." plus, when a limit is reached, the limit's name (weekly
-  or 5-hour) and when it lifts.
-- It is posted to the errors webhook, so it is not lost on a muted channel.
-- On the window webhook it replaces "Usage limit reached" or "Weekly limit
-  reached" for that pulse.
-- A WARN log line, `Pulse ran on paid extra usage`, names the limit.
-- A pulse that failed is not billed and is not announced this way.
-- No new setting, and no scheduling change: nothing is skipped. An
-  "avoid credits" option was considered and dropped: it could only guess from
-  the previous event, and the exposure is a cent and a half per pulse
-  that runs on credits.
-- The errors webhook setting is named `DISCORD_ERROR_WEBHOOK_URL` (formerly
-  `DISCORD_WEBHOOK_URL`, whose old name is ignored).
-
 ## 6. Persisted schedule (T53, Q27 a)
 
 - New optional setting `STATE_DIR` (absolute path). When set, the scheduler
@@ -204,6 +179,33 @@ and a restart without `STATE_DIR`, whose startup pulse runs again.
 - The image creates `/data` owned by the `claudepulse` user (uid 1001), so a
   named volume mounted there is writable. The compose file documents
   `STATE_DIR=/data` with a named volume.
+
+## 7. Extra usage alert (T56)
+
+A successful pulse whose rate limit reports `overage.using === true` ran on
+paid extra usage: a limit is reached and the account allows extra usage. The
+report arrives after the pulse, so it cannot be undone; the scheduler already
+plans the next pulse for the blocking limit's reset, so a blocked period
+normally costs one pulse on credits (about 1.5 cents each). Two cases add
+another: the first pulse at `SCHEDULED_START_HOUR`, which outranks the window,
+and a restart without `STATE_DIR`, whose startup pulse runs again.
+
+- Each such pulse produces "Extra usage in use" (WARN): "This pulse ran on
+  paid extra usage." plus, when a limit is reached, the limit's name (weekly
+  or 5-hour) and when it lifts.
+- It is posted to the errors webhook, so it is not lost on a muted channel.
+  When both webhook settings name the same URL, it is posted there once.
+- On the window webhook it replaces "Usage limit reached" or "Weekly limit
+  reached" for that pulse.
+- A WARN log line, `Pulse ran on paid extra usage`, names the limit.
+- A pulse that failed is not billed and is not announced this way.
+- A post Discord refuses is logged as a warning naming the notifier.
+- No new setting, and no scheduling change: nothing is skipped. An
+  "avoid credits" option was considered and dropped: it could only guess from
+  the previous event, and the exposure is a cent and a half per pulse
+  that runs on credits.
+- The errors webhook setting is named `DISCORD_ERROR_WEBHOOK_URL` (formerly
+  `DISCORD_WEBHOOK_URL`, whose old name is ignored).
 
 ## Out of scope
 

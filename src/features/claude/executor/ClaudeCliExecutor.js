@@ -174,10 +174,12 @@ function extractRateLimit(lines) {
 /**
  * Runs Claude Code as a subprocess to open a session window.
  *
- * The argument list is deliberately fixed. Two omissions are load-bearing:
- * `--bare` stops the CLI reading CLAUDE_CODE_OAUTH_TOKEN, and overriding the
- * system prompt voids the prompt cache, which measured 3.8x more expensive
- * because a custom prompt no longer matches the cached prefix.
+ * The argument list is deliberately fixed. `--bare` is never passed: it stops
+ * the CLI reading CLAUDE_CODE_OAUTH_TOKEN. The tool list and the system prompt
+ * are replaced together (see PULSE_SYSTEM_PROMPT): a custom prompt that keeps
+ * the CLI's tools measured 3.8x more expensive than the default, because the
+ * tool definitions then miss the prompt cache, and the default prompt with its
+ * tools costs about ten times what the lean pulse does.
  */
 export class ClaudeCliExecutor {
   /**

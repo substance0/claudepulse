@@ -328,7 +328,7 @@ export class PulseScheduler {
       this.lastSuccessTime = new Date();
     }
 
-    this._announceWindow(pulseResult);
+    this._notify(pulseResult);
 
     // An exhausted allowance means Claude is in use, not that ClaudePulse is
     // broken, so callers do not count it as a failure.
@@ -479,7 +479,7 @@ export class PulseScheduler {
    * affects the pulse, or the other notification.
    * @param {Object} pulseResult - Result from _sendPulse()
    */
-  _announceWindow(pulseResult) {
+  _notify(pulseResult) {
     this._deliver(this.notifier, pulseResult, "Window notification failed");
     this._deliver(this.alerter, pulseResult, "Extra usage alert failed");
   }

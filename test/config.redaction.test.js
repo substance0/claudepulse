@@ -274,6 +274,8 @@ test("reads the errors webhook from DISCORD_ERROR_WEBHOOK_URL", async () => {
 
 test("ignores the previous name of the errors webhook setting", async () => {
   const { loadConfig } = await import("../src/core/config/index.js");
+  const exported = process.env.DISCORD_ERROR_WEBHOOK_URL;
+  delete process.env.DISCORD_ERROR_WEBHOOK_URL;
   process.env.DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/6/old-name";
 
   try {
@@ -282,5 +284,6 @@ test("ignores the previous name of the errors webhook setting", async () => {
     assert.equal("DISCORD_WEBHOOK_URL" in config, false);
   } finally {
     delete process.env.DISCORD_WEBHOOK_URL;
+    if (exported !== undefined) process.env.DISCORD_ERROR_WEBHOOK_URL = exported;
   }
 });

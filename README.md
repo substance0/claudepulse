@@ -37,7 +37,7 @@ Claude's 5-hour windows don't start on their own when the previous one resets. A
 
 ## How It Works
 
-1. **A pulse** runs Claude Code once (`claude -p`) on the cheapest model, with thinking disabled and an isolated configuration, so it costs as little as possible.
+1. **A pulse** runs Claude Code once (`claude -p`) on the cheapest model, with thinking disabled, no tools, a one-line system prompt and an isolated configuration, so it is a single short call and costs as little as possible.
 2. **Claude Code reports when the current window resets.** ClaudePulse schedules the next pulse just after that time, so one pulse per window is enough.
 3. **At startup**, ClaudePulse pulses right away to learn the current window, or waits for `SCHEDULED_START_HOUR` if you set one. Until a window is known, it pulses hourly.
 4. **Work hours** (opt-in, `WORK_HOURS_ENABLED=true`): with `WORK_START`, `WORK_END` and `HOURS_LEFT_AT_START`, the first pulse of each working day lands so the window has that many hours left when you start, and a fresh window follows soon after. No pulse is sent at night, on days off, or at startup outside these hours.

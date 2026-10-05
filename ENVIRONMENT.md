@@ -110,6 +110,9 @@ WORK_DAYS=Mon-Fri
 **Default:** `"pulse check"`
 **Recommended:** 1-50 characters for minimal token usage
 
+Every pulse also carries a one-line system prompt (`Reply with the single word
+ok.`) and no tools, so the reply stays one word whatever this message says.
+
 **Examples:**
 
 ```bash

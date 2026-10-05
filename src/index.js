@@ -8,7 +8,10 @@ import {
   validateConfig,
 } from "./core/config/index.js";
 import { ClaudeCliExecutor } from "./features/claude/executor/ClaudeCliExecutor.js";
-import { createWindowNotifier } from "./core/services/windowNotification.js";
+import {
+  createExtraUsageAlerter,
+  createWindowNotifier,
+} from "./core/services/windowNotification.js";
 import {
   createStateStore,
   scheduleFingerprint,
@@ -132,11 +135,20 @@ async function runScheduler(config, logger) {
       })
     : undefined;
 
+  // Extra usage is spending: it also goes to the errors webhook, which is not
+  // meant to be muted like the window channel.
+  const alerter = config.DISCORD_ERROR_WEBHOOK_URL
+    ? createExtraUsageAlerter(config.DISCORD_ERROR_WEBHOOK_URL, {
+        label: config.ACCOUNT_LABEL,
+      })
+    : undefined;
+
   const scheduler = new PulseScheduler({
     executor,
     logger,
     config,
     notifier,
+    alerter,
     workHours: createWorkHoursFromConfig(config),
     stateStore: config.STATE_DIR ? createStateStore(config.STATE_DIR) : undefined,
     stateFingerprint: scheduleFingerprint(config),

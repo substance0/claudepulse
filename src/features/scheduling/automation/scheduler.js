@@ -1,6 +1,6 @@
 import { DateUtility } from "../../../core/utils/DateUtility.js";
 import { SchedulingStrategyManager } from "../strategy/scheduling-strategies.js";
-import { isWeeklyRejection } from "../../../core/services/windowNotification.js";
+import { blockingLimit } from "../../../core/services/windowNotification.js";
 
 /**
  * Claude Session Automation Scheduler
@@ -109,6 +109,7 @@ export class PulseScheduler {
    * @param {Object} options.logger - Logger instance
    * @param {Object} options.config - Configuration object
    * @param {{notify: Function}} [options.notifier] - Announces each pulse's window
+   * @param {{notify: Function}} [options.alerter] - Alerts when a pulse ran on paid extra usage
    * @param {{nextAllowed: Function, isActive: Function}} [options.workHours] - Limits pulses to working hours
    * @param {{load: Function, save: Function}} [options.stateStore] - Persists the schedule across restarts
    * @param {string} [options.stateFingerprint] - Identifies the scheduling settings; a saved schedule made under other settings is not resumed
@@ -129,6 +130,7 @@ export class PulseScheduler {
     // Injected dependencies
     this.executor = options.executor;
     this.notifier = options.notifier;
+    this.alerter = options.alerter;
     this.workHours = options.workHours ?? null;
     this.stateStore = options.stateStore ?? null;
     this.stateFingerprint = options.stateFingerprint ?? "";
@@ -253,6 +255,14 @@ export class PulseScheduler {
           timerDurationMs: duration?.ms,
         });
 
+        // Visible at LOG_LEVEL=WARN and without any webhook: this pulse was
+        // billed to the account's extra usage credits.
+        if (result.rateLimit?.overage?.using === true) {
+          this.logger.warn("pulse", "Pulse ran on paid extra usage", {
+            limit: blockingLimit(result.rateLimit) ?? undefined,
+          });
+        }
+
         return {
           success: true,
           result,
@@ -264,7 +274,7 @@ export class PulseScheduler {
       if (isLimitReached(result)) {
         this.logger.info("pulse", "Usage limit reached - waiting for reset", {
           resetsAt: result.rateLimit.resetsAt?.toISOString(),
-          limit: isWeeklyRejection(result.rateLimit) ? "weekly" : "5-hour",
+          limit: blockingLimit(result.rateLimit),
           timerDurationMs: duration?.ms,
         });
       } else {
@@ -464,21 +474,31 @@ export class PulseScheduler {
   }
 
   /**
-   * Hand a pulse result to the window notifier without waiting on it. A
-   * notification that fails is logged and never affects the pulse.
+   * Hand a pulse result to the window notifier and the extra usage alerter,
+   * without waiting on either. A notification that fails is logged and never
+   * affects the pulse, or the other notification.
    * @param {Object} pulseResult - Result from _sendPulse()
    */
   _announceWindow(pulseResult) {
-    if (!this.notifier) {
+    this._deliver(this.notifier, pulseResult, "Window notification failed");
+    this._deliver(this.alerter, pulseResult, "Extra usage alert failed");
+  }
+
+  /**
+   * Hand a pulse result to one notifier without waiting on it.
+   * @param {?{notify: Function}} target
+   * @param {Object} pulseResult
+   * @param {string} failureMessage - Logged when the notifier fails
+   */
+  _deliver(target, pulseResult, failureMessage) {
+    if (!target) {
       return;
     }
 
     Promise.resolve()
-      .then(() => this.notifier.notify(pulseResult))
+      .then(() => target.notify(pulseResult))
       .catch((error) => {
-        this.logger.warn("notify", "Window notification failed", {
-          error: error.message,
-        });
+        this.logger.warn("notify", failureMessage, { error: error.message });
       });
   }
 

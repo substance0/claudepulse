@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildExtraUsageNotification,
   buildWindowNotification,
+  createExtraUsageAlerter,
   createWindowNotifier,
 } from "../src/core/services/windowNotification.js";
 
@@ -271,4 +273,118 @@ test("labels the weekly limit notification with the account", async () => {
   });
 
   assert.equal(sent[0].title, "work · Weekly limit reached");
+});
+
+// --- Extra usage -----------------------------------------------------------
+
+/** A pulse that succeeded on paid extra usage because a limit is reached. */
+function extraUsagePulse(rateLimit = {}) {
+  return {
+    success: true,
+    rateLimit: {
+      status: "rejected",
+      resetsAt: WEEK_RESET,
+      fiveHourResetsAt: null,
+      limitType: "seven_day",
+      weekly: { utilization: 1, resetsAt: WEEK_RESET },
+      overage: { status: "allowed", disabledReason: null, using: true, resetsAt: null },
+      ...rateLimit,
+    },
+  };
+}
+
+test("announces a pulse that ran on paid extra usage because the weekly limit is reached", () => {
+  const payload = buildExtraUsageNotification(extraUsagePulse());
+
+  assert.equal(payload.title, "Extra usage in use");
+  assert.equal(payload.level, "WARN");
+  assert.match(payload.description, /ran on paid extra usage/);
+  assert.match(payload.description, /weekly limit is reached/);
+  // Days away: date and countdown
+  assert.match(payload.description, new RegExp(`<t:${WEEK_EPOCH}:F>`));
+  assert.match(payload.description, new RegExp(`<t:${WEEK_EPOCH}:R>`));
+});
+
+test("names the 5-hour limit when that is the one reached", () => {
+  const payload = buildExtraUsageNotification(
+    extraUsagePulse({ resetsAt: RESET, limitType: "five_hour", weekly: null }),
+  );
+
+  assert.match(payload.description, /5-hour limit is reached/);
+  assert.match(payload.description, new RegExp(`<t:${RESET_EPOCH}:t>`));
+});
+
+test("says only that extra usage was used when the limit is not known", () => {
+  // A newer CLI could report extra usage without a rejected limit
+  const payload = buildExtraUsageNotification(
+    extraUsagePulse({ status: "allowed", resetsAt: null }),
+  );
+
+  assert.equal(payload.description, "This pulse ran on paid extra usage.");
+});
+
+test("announces nothing when extra usage is not in use", () => {
+  const using = extraUsagePulse().rateLimit.overage;
+
+  assert.equal(
+    buildExtraUsageNotification(extraUsagePulse({ overage: { ...using, using: false } })),
+    null,
+  );
+  assert.equal(buildExtraUsageNotification(extraUsagePulse({ overage: null })), null);
+  assert.equal(buildExtraUsageNotification({ success: true, rateLimit: null }), null);
+});
+
+test("announces nothing for a pulse that failed, since nothing was billed", () => {
+  assert.equal(buildExtraUsageNotification({ ...extraUsagePulse(), success: false }), null);
+});
+
+test("the window announcement says extra usage was used instead of the limit message", () => {
+  const payload = buildWindowNotification(extraUsagePulse());
+
+  assert.equal(payload.title, "Extra usage in use");
+});
+
+test("a failed pulse keeps the limit message", () => {
+  const payload = buildWindowNotification({ ...extraUsagePulse(), success: false });
+
+  assert.equal(payload.title, "Weekly limit reached");
+});
+
+test("the window notifier prefixes the extra usage title with the account", async () => {
+  const sent = [];
+  const notifier = createWindowNotifier("https://discord.test/window", {
+    label: "work",
+    send: async (payload) => sent.push(payload),
+  });
+
+  await notifier.notify(extraUsagePulse());
+
+  assert.equal(sent[0].title, "work · Extra usage in use");
+});
+
+test("the alerter posts an extra usage pulse to its webhook, labelled", async () => {
+  const sent = [];
+  const alerter = createExtraUsageAlerter("https://discord.test/errors", {
+    label: "work",
+    send: async (payload, url) => sent.push({ payload, url }),
+  });
+
+  await alerter.notify(extraUsagePulse());
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].url, "https://discord.test/errors");
+  assert.equal(sent[0].payload.title, "work · Extra usage in use");
+});
+
+test("the alerter stays silent for ordinary pulses and limit messages", async () => {
+  const sent = [];
+  const alerter = createExtraUsageAlerter("https://discord.test/errors", {
+    send: async (payload) => sent.push(payload),
+  });
+
+  await alerter.notify(allowedPulse());
+  await alerter.notify(rejectedPulse());
+  await alerter.notify({ success: false, rateLimit: null });
+
+  assert.deepEqual(sent, []);
 });

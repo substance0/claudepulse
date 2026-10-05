@@ -3,6 +3,10 @@
  * Announces on Discord when the current usage window resets, after each
  * pulse. Posts to a webhook of its own so the channel can be muted
  * independently of error alerts.
+ *
+ * A pulse that ran on paid extra usage is announced in place of the limit
+ * message, and can also be posted to the errors webhook, which is not meant
+ * to be muted.
  */
 
 import { sendDiscordAlert } from "./notificationService.js";
@@ -57,6 +61,18 @@ export function isWeeklyRejection(rateLimit) {
 }
 
 /**
+ * Which limit refused a pulse: the weekly one or the 5-hour window.
+ * @param {?{status: string}} rateLimit
+ * @returns {?("weekly"|"5-hour")} Null unless the pulse's limit was reached
+ */
+export function blockingLimit(rateLimit) {
+  if (rateLimit?.status !== "rejected") {
+    return null;
+  }
+  return isWeeklyRejection(rateLimit) ? "weekly" : "5-hour";
+}
+
+/**
  * A line showing weekly usage, or "" when the weekly window is unknown.
  * @param {?{utilization: ?number, resetsAt: ?Date}} weekly
  * @returns {string}
@@ -71,6 +87,36 @@ function weeklyUsageLine(weekly) {
 }
 
 /**
+ * Build the Discord payload for a pulse that ran on paid extra usage, or null
+ * for any other pulse. A pulse that failed is not billed, so it is not
+ * announced.
+ * @param {{success: boolean, rateLimit: ?{status: string, resetsAt: ?Date, overage: ?{using: ?boolean}}}} pulseResult
+ * @returns {?{title: string, description: string, level: string}}
+ */
+export function buildExtraUsageNotification(pulseResult) {
+  const rateLimit = pulseResult?.rateLimit;
+  if (!pulseResult?.success || rateLimit?.overage?.using !== true) {
+    return null;
+  }
+
+  const limit = blockingLimit(rateLimit);
+  const lifts =
+    limit && isValidDate(rateLimit.resetsAt)
+      ? ` The ${limit} limit is reached and lifts ${
+          limit === "weekly"
+            ? discordDateTime(rateLimit.resetsAt)
+            : discordTime(rateLimit.resetsAt)
+        }; the next pulse follows then.`
+      : "";
+
+  return {
+    title: "Extra usage in use",
+    description: `This pulse ran on paid extra usage.${lifts}`,
+    level: "WARN",
+  };
+}
+
+/**
  * Build the Discord payload announcing a pulse's window, or null when the
  * pulse reported no usable window.
  * @param {{success: boolean, rateLimit: ?{status: string, resetsAt: ?Date, fiveHourResetsAt: ?Date}}} pulseResult
@@ -80,6 +126,13 @@ export function buildWindowNotification(pulseResult) {
   const rateLimit = pulseResult?.rateLimit;
   if (!rateLimit) {
     return null;
+  }
+
+  // The pulse ran, on credits: the limit message would wrongly say that
+  // pulsing resumes when the limit lifts.
+  const extraUsage = buildExtraUsageNotification(pulseResult);
+  if (extraUsage) {
+    return extraUsage;
   }
 
   if (rateLimit.status === "rejected") {
@@ -118,19 +171,21 @@ export function buildWindowNotification(pulseResult) {
 }
 
 /**
- * Create a notifier that posts window announcements to one webhook.
- * @param {string} webhookUrl - Discord webhook for window announcements
+ * Create a notifier that posts what `build` makes of a pulse to one webhook.
+ * @param {(pulseResult: Object) => ?Object} build - Payload builder
+ * @param {string} webhookUrl - Discord webhook
  * @param {{send?: Function, label?: string}} [options] - Discord sender
  *   (overridable in tests) and the account label prefixed to titles
  * @returns {{notify: (pulseResult: Object) => Promise<void>}}
  */
-export function createWindowNotifier(
+function createNotifier(
+  build,
   webhookUrl,
   { send = sendDiscordAlert, label } = {},
 ) {
   return {
     async notify(pulseResult) {
-      const payload = buildWindowNotification(pulseResult);
+      const payload = build(pulseResult);
       if (!payload) {
         return;
       }
@@ -138,4 +193,25 @@ export function createWindowNotifier(
       await send({ ...payload, title }, webhookUrl);
     },
   };
+}
+
+/**
+ * Create a notifier that posts window announcements to one webhook.
+ * @param {string} webhookUrl - Discord webhook for window announcements
+ * @param {{send?: Function, label?: string}} [options]
+ * @returns {{notify: (pulseResult: Object) => Promise<void>}}
+ */
+export function createWindowNotifier(webhookUrl, options) {
+  return createNotifier(buildWindowNotification, webhookUrl, options);
+}
+
+/**
+ * Create an alerter that posts only pulses that ran on paid extra usage, to
+ * the errors webhook.
+ * @param {string} webhookUrl - Discord webhook for errors and alerts
+ * @param {{send?: Function, label?: string}} [options]
+ * @returns {{notify: (pulseResult: Object) => Promise<void>}}
+ */
+export function createExtraUsageAlerter(webhookUrl, options) {
+  return createNotifier(buildExtraUsageNotification, webhookUrl, options);
 }

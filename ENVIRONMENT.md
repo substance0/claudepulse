@@ -90,6 +90,14 @@ pulse comes sooner, a startup warning explains that mornings may start with
 fewer hours left, and suggests an earlier `WORK_END` or switching work hours
 off.
 
+`WORK_END` is the last moment a window may start, not the time you stop
+working: a window opened before it runs its full 5 hours, and you can keep
+working inside it. If you also work in a separate late session, set `WORK_END`
+later. With `WORK_START=09:00`, `HOURS_LEFT_AT_START=2` and `WORK_END=23:59`,
+the chain gains a pulse at 21:00:10 whose window resets at 02:00, so a session
+that starts at midnight finds 2 hours left. Nothing pulses between 02:00 and
+the next day's first pulse at 06:00:10.
+
 `WORK_HOURS_ENABLED=true` and `SCHEDULED_START_HOUR` cannot both be set.
 
 ```bash
@@ -450,7 +458,7 @@ ignored, so rename it in `claudepulse.env` or errors stop reaching Discord.
 
 **Extra usage:** when a limit is reached and the account allows extra usage,
 Claude Code keeps working on paid credits, and a pulse sent then is billed
-(about a cent and a half). Such a pulse posts "Extra usage in use" here, naming
+(a few hundredths of a cent). Such a pulse posts "Extra usage in use" here, naming
 the limit that is reached and when it lifts, and logs
 `[WARN] Pulse ran on paid extra usage`. After it, the next pulse is planned for
 that reset, so a blocked period normally costs one such pulse. A pulse at

@@ -436,12 +436,22 @@ ignored, so rename it in `claudepulse.env` or errors stop reaching Discord.
 - Sends rich embeds to Discord channel on ERROR level logs
 - Includes error details, category, timestamp, and context
 - Non-blocking (failures don't affect application)
-- Only triggers on actual errors (not INFO/WARN logs), plus the token expiry
-  warnings described under `TOKEN_EXPIRES_AT`
+- Only triggers on actual errors (not INFO/WARN logs), plus two alerts: the
+  token expiry warnings described under `TOKEN_EXPIRES_AT`, and "Extra usage
+  in use" when a pulse ran on paid extra usage (see below)
 - Repeated pulse failures alert at widening intervals — on the 1st, 2nd, 4th,
   8th consecutive failure and so on — instead of once per cycle. A sustained
   outage therefore stays visible without flooding the channel, and the counter
   resets on the first successful pulse.
+
+**Extra usage:** when a limit is reached and the account allows extra usage,
+Claude Code keeps working on paid credits, and a pulse sent then is billed
+(about a cent and a half). Such a pulse posts "Extra usage in use" here, naming
+the limit that is reached and when it lifts, and logs
+`[WARN] Pulse ran on paid extra usage`. After it, the next pulse is planned for
+that reset, so at most one pulse runs on credits per blocked period. Nothing
+is skipped: ClaudePulse tells you; it does not decide for you. The same
+message replaces "Usage limit reached" on the window webhook for that pulse.
 
 The webhook URL is masked as `[REDACTED]` in the startup configuration log, so
 it is not exposed to anyone reading container logs.
@@ -490,7 +500,8 @@ reset time is visible from a phone.
   time. Discord shows it in each reader's own time zone, with a countdown.
 - When a pulse is refused, posts "Usage limit reached" with the time the
   limit lifts, or "Weekly limit reached" with the date and time the weekly
-  limit lifts. Pulsing resumes on its own at that time.
+  limit lifts. Pulsing resumes on its own at that time. If the pulse instead
+  ran on paid extra usage, it posts "Extra usage in use" in their place.
 - "Window open" also shows weekly usage and when the weekly window resets.
 - Uses a webhook of its own. Create it in a dedicated channel, then mute or
   unmute that channel in Discord to turn announcements off and on without
@@ -645,10 +656,11 @@ account's billing (`canUserPurchaseCredits`, `hasChargeableSavedPaymentMethod`)
 are replaced by `[omitted]`, but other values are printed as received.
 
 When a pulse is drawing on paid extra usage, its log line ends with
-`overage=on`:
+`overage=on`, and a `[WARN]` line, `Pulse ran on paid extra usage`, names the
+limit that is reached. The errors webhook gets an "Extra usage in use" alert:
 
 ```bash
-docker logs claudepulse 2>&1 | grep "overage=on"
+docker logs claudepulse 2>&1 | grep "paid extra usage"
 ```
 
 ---

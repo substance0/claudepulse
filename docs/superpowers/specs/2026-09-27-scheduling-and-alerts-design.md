@@ -147,8 +147,31 @@ Claude CLI can also send `overageResetsAt`, `overageInUse`, `limitScope`,
   "Unrecognised rate-limit fields". Values of the two billing flags
   (`canUserPurchaseCredits`, `hasChargeableSavedPaymentMethod`) are replaced
   by `[omitted]`, since operators paste the line into issues.
-- Acting on extra usage, such as skipping pulses while it is in use, is a
-  follow-up design (T56).
+- Telling the operator when a pulse ran on extra usage (T56) is built; skipping
+  pulses to avoid it is not (see §7).
+
+## 7. Extra usage alert (T56)
+
+A successful pulse whose rate limit reports `overage.using === true` ran on
+paid extra usage: a limit is reached and the account allows extra usage. The
+report arrives after the pulse, so it cannot be undone; the scheduler already
+plans the next pulse for the blocking limit's reset, so at most one pulse per
+blocked period runs on credits (about 1.5 cents each).
+
+- Each such pulse produces "Extra usage in use" (WARN): "This pulse ran on
+  paid extra usage." plus, when a limit is reached, the limit's name (weekly
+  or 5-hour) and when it lifts.
+- It is posted to the errors webhook, so it is not lost on a muted channel.
+- On the window webhook it replaces "Usage limit reached" or "Weekly limit
+  reached" for that pulse.
+- A WARN log line, `Pulse ran on paid extra usage`, names the limit.
+- A pulse that failed is not billed and is not announced this way.
+- No new setting, and no scheduling change: nothing is skipped. An
+  "avoid credits" option was considered and dropped: it could only guess from
+  the previous event, and the exposure is a cent and a half per blocked
+  period.
+- The errors webhook setting is named `DISCORD_ERROR_WEBHOOK_URL` (formerly
+  `DISCORD_WEBHOOK_URL`, whose old name is ignored).
 
 ## 6. Persisted schedule (T53, Q27 a)
 

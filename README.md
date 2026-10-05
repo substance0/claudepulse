@@ -183,8 +183,8 @@ Every setting has a default. Pass settings with `-e` or under `environment:`, an
 
 ClaudePulse can post to two Discord webhooks:
 
-- **Errors and alerts** (`DISCORD_ERROR_WEBHOOK_URL`, formerly `DISCORD_WEBHOOK_URL`, whose old name is now ignored): failed pulses and other errors, spaced out during an outage, plus token expiry warnings when `TOKEN_EXPIRES_AT` is set. Keep it on a channel you do not mute.
-- **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, or "Weekly limit reached" with the date it lifts. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
+- **Errors and alerts** (`DISCORD_ERROR_WEBHOOK_URL`, formerly `DISCORD_WEBHOOK_URL`, whose old name is now ignored): failed pulses and other errors, spaced out during an outage, plus token expiry warnings when `TOKEN_EXPIRES_AT` is set, and an "Extra usage in use" alert when a pulse ran on paid extra usage credits. Keep it on a channel you do not mute.
+- **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, "Weekly limit reached" with the date it lifts, or "Extra usage in use" when the pulse ran on paid credits instead. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
 
 To set one up:
 

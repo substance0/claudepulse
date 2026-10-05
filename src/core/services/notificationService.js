@@ -71,8 +71,12 @@ export async function sendDiscordAlert(payload, webhookUrl) {
     }
     return response.ok;
   } catch (error) {
-    // Gracefully handle network errors
-    console.error(`Failed to send Discord notification: ${error.message}`);
+    // Gracefully handle network errors. The message is left out on purpose:
+    // for a URL that cannot be parsed it repeats the whole URL, token included.
+    const code = error.cause?.code;
+    console.error(
+      `Failed to send Discord notification: ${error.name}${code ? ` (${code})` : ""}`,
+    );
     return false;
   }
 }

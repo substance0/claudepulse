@@ -28,6 +28,18 @@ test("reports an alert that never reached Discord", async (t) => {
   assert.equal(await sendDiscordAlert(PAYLOAD, WEBHOOK), false);
 });
 
+test("never logs a webhook URL that cannot be parsed", async (t) => {
+  // A value copied with its quotes, as an env file read by `docker run --env-file` keeps them
+  const quoted = '"https://discord.com/api/webhooks/123/SECRET-TOKEN"';
+  const logged = [];
+  t.mock.method(console, "error", (line) => logged.push(String(line)));
+
+  assert.equal(await sendDiscordAlert(PAYLOAD, quoted), false);
+
+  assert.equal(logged.length, 1);
+  assert.doesNotMatch(logged[0], /SECRET-TOKEN/);
+});
+
 test("reports nothing sent without a webhook", async () => {
   assert.equal(await sendDiscordAlert(PAYLOAD, undefined), false);
 });

@@ -155,11 +155,31 @@ gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
 | ---------------------------- | -------------------------- | ----------------------------------------- |
 | `pr-checks.yml`              | every pull request         | tests, actionlint, secret scan            |
 | `links.yml`                  | docs change, weekly        | dead links in the Markdown files          |
+| `claude.yml`                 | `@claude` in an issue or pull request | answers and edits, for people with write access |
+| `claude-review.yml`          | pull request opened or ready | one review of changes to code           |
+| `dependabot-automerge.yml`   | every 6 hours, on demand   | merges Dependabot pull requests that are safe and green |
 | `release.yml`                | push to `main`             | tests, semantic-release, release image    |
 | `docker-edge.yml`            | push to `main`             | `edge` image                              |
 | `docker-snapshot.yml`        | on demand                  | `snapshot-<branch>` image                 |
 | `docker-release-rebuild.yml` | on demand                  | rebuilds a release's image from its tag   |
 | `docker-build.yml`           | called by the image workflows | shared test, build, push and provenance |
+
+### GitHub automation
+
+Claude answers on GitHub through `anthropics/claude-code-action`, pinned to a commit. `claude.yml` and `claude-review.yml` do nothing until this one-time setup is done, by a repository admin:
+
+1. Install the [Claude GitHub App](https://github.com/apps/claude) on the repository.
+2. Add a token from `claude setup-token` as the `CLAUDE_CODE_OAUTH_TOKEN` secret. Runs use that token's subscription, so they count against its usage limits.
+3. Set the variable `CLAUDE_AUTOMATION` to `true`. Any other value stops both workflows.
+
+```bash
+gh secret set CLAUDE_CODE_OAUTH_TOKEN   # paste the token when prompted
+gh variable set CLAUDE_AUTOMATION --body true
+```
+
+Comment `@claude` followed by a request on an issue or pull request. Only the owner, members and collaborators can trigger it. The cost of a run is bounded by `--model`, `--max-turns` and the job timeout in each workflow's `claude_args`. A pull request that changes code is reviewed once, when it opens or leaves draft, unless it is a draft, comes from a fork or comes from Dependabot; comment `@claude review this` for another look. The repository's `CLAUDE.md` holds the rules Claude follows, including no attribution in commits.
+
+`dependabot-automerge.yml` sweeps the open Dependabot pull requests every 6 hours and squash-merges those that `scripts/dependabot-eligibility.mjs` finds safe: only patch and minor updates to the root `package.json` and `package-lock.json` or to workflow actions, with every check passed. Its tests use the shapes of real pull requests. The Claude CLI in `docker/claude-cli`, the Dockerfile and every major update wait for a person, because they decide how pulses run. It runs from the default branch on a schedule, not after the checks finish: a workflow never starts on another workflow's completion, and `pr-checks.yml` keeps a read-only token. A merge made with the workflow's token does not start the push workflows, which is fine for updates that change no image input.
 
 ## Need Help?
 

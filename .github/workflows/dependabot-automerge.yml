@@ -1,0 +1,44 @@
+name: Dependabot auto-merge
+
+# Merges the open Dependabot pull requests that scripts/dependabot-eligibility.mjs
+# finds safe: only patch and minor updates to the release tooling or the
+# workflow actions, with every check passed. The Claude CLI, the Dockerfile and
+# major updates are left to a person. It sweeps on a schedule, from the default
+# branch, so nothing waits inside a pull request run and no branch protection is
+# needed.
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: dependabot-automerge
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # A pull request that is not eligible yet, or at all, is a normal outcome.
+      - name: Merge the eligible pull requests
+        run: |
+          for pr in $(gh pr list --author "app/dependabot" --state open --json number --jq '.[].number'); do
+            echo "== #$pr"
+            if gh pr view "$pr" --json author,files,commits,statusCheckRollup | node scripts/dependabot-eligibility.mjs; then
+              gh pr merge "$pr" --squash --delete-branch
+            fi
+          done

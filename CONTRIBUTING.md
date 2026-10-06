@@ -41,7 +41,7 @@ npm test               # node --test, built-ins only
 npm run check:syntax   # node --check on every source, script and test file
 ```
 
-Pull requests also lint the workflow files with actionlint and scan the whole history for secrets.
+Pull requests also lint the workflow files with actionlint and scan the whole history for secrets. One that changes the pinned Claude CLI or the pulse arguments also checks that the CLI still lists every flag a pulse passes: `npm ci --omit=dev --prefix docker/claude-cli`, then `node scripts/check-cli-flags.mjs docker/claude-cli/node_modules/.bin/claude`. It is not a required status, so merge a CLI bump only when that check is green.
 
 ### Secret Scanning
 
@@ -77,7 +77,7 @@ claudepulse/
 ├── assets/                    # Logo and visual assets
 ├── docker/claude-cli/         # Pinned Claude Code CLI installed in the image
 ├── docs/                      # Workflow diagrams
-├── scripts/                   # Build helpers (dev image versions)
+├── scripts/                   # Build and CI helpers (image versions, CLI flag check)
 ├── src/                       # Source code
 │   ├── core/                  # Configuration, logging, notifications
 │   ├── features/
@@ -155,6 +155,7 @@ gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
 | ---------------------------- | -------------------------- | ----------------------------------------- |
 | `pr-checks.yml`              | every pull request         | tests, actionlint, secret scan            |
 | `links.yml`                  | docs change, weekly        | dead links in the Markdown files          |
+| `cli-flags.yml`              | pinned CLI or pulse arguments change | the pinned CLI still lists every flag a pulse passes |
 | `claude.yml`                 | `@claude` in an issue or pull request | answers and edits, for people with write access |
 | `claude-review.yml`          | pull request opened or ready | one review of changes to code           |
 | `dependabot-automerge.yml`   | every 6 hours, on demand   | merges Dependabot pull requests that are safe and green |

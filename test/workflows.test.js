@@ -245,6 +245,40 @@ test("pull request checks get a read-only token", () => {
   assert.doesNotMatch(text, /secrets\./);
 });
 
+test("the Claude action is pinned to a commit, because it receives the Claude token", () => {
+  for (const name of ["claude.yml", "claude-review.yml"]) {
+    const uses = read(name).match(/uses: anthropics\/claude-code-action@(\S+)/);
+    assert.match(uses?.[1] ?? "", /^[0-9a-f]{40}$/, name);
+  }
+});
+
+test("the Claude workflows do nothing until the owner switches them on", () => {
+  for (const name of ["claude.yml", "claude-review.yml"]) {
+    assert.match(read(name), /vars\.CLAUDE_AUTOMATION == 'true'/, name);
+  }
+});
+
+test("only people with write access can start Claude from a comment", () => {
+  const text = read("claude.yml");
+  assert.match(text, /\["OWNER","MEMBER","COLLABORATOR"\]/);
+  assert.doesNotMatch(text, /allowed_non_write_users|allowed_bots/);
+});
+
+test("the review skips forks, drafts and Dependabot", () => {
+  const text = read("claude-review.yml");
+  assert.match(text, /!github\.event\.pull_request\.draft/);
+  assert.match(text, /head\.repo\.full_name == github\.repository/);
+  assert.match(text, /github\.actor != 'dependabot\[bot\]'/);
+});
+
+test("Dependabot pull requests are merged only after the eligibility script says so", () => {
+  const text = read("dependabot-automerge.yml");
+  assert.match(text, /scripts\/dependabot-eligibility\.mjs/);
+  assert.doesNotMatch(text, /pull_request_target/);
+  // A merge must follow the check, so the script's exit code gates it.
+  assert.match(text, /if gh pr view .*dependabot-eligibility\.mjs; then\s+gh pr merge/s);
+});
+
 test("Dependabot never proposes an odd-numbered Node major", () => {
   const text = fs.readFileSync(".github/dependabot.yml", "utf8");
   for (const major of [25, 27, 29]) {

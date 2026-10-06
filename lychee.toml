@@ -1,0 +1,18 @@
+# Settings for the documentation link checker. Used by
+# .github/workflows/links.yml, and runnable locally with
+#   lychee --config lychee.toml '**/*.md'
+
+no_progress = true
+
+# Check each #anchor against the headings of the Markdown file it points at.
+include_fragments = "anchor-only"
+
+# A slow or briefly unavailable site is retried before a link counts as dead.
+max_retries = 3
+retry_wait_time = 5
+timeout = 30
+
+# A rate-limited answer says nothing about whether the link is alive.
+accept = ["200..=299", "429"]
+
+exclude_path = ["node_modules"]

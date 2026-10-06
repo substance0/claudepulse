@@ -154,6 +154,7 @@ gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
 | Workflow                     | Runs on                    | Does                                      |
 | ---------------------------- | -------------------------- | ----------------------------------------- |
 | `pr-checks.yml`              | every pull request         | tests, actionlint, secret scan            |
+| `links.yml`                  | docs change, weekly        | dead links in the Markdown files          |
 | `release.yml`                | push to `main`             | tests, semantic-release, release image    |
 | `docker-edge.yml`            | push to `main`             | `edge` image                              |
 | `docker-snapshot.yml`        | on demand                  | `snapshot-<branch>` image                 |

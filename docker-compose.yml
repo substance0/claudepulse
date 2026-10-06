@@ -34,6 +34,12 @@ services:
     labels:
       - "com.claudepulse.service=claudepulse"
       - "com.claudepulse.description=ClaudePulse - Automated Claude Code session renewal with intelligent pulse scheduling for maximum Pro/Max subscription value"
+    # The image runs as an unprivileged user and uses no Linux capability, so
+    # the container gives up all of them and cannot gain privileges.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     # Healthcheck comes from the image, which verifies the Claude CLI that
     # pulses run. Defining one here would override it.
     restart: unless-stopped

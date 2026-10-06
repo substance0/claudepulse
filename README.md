@@ -312,6 +312,15 @@ Both can share Discord webhooks: every message names its account. If you enable 
 
 **Is my token safe?** ClaudePulse never reads, logs or stores the token: it stays in the container's environment, where the Claude CLI picks it up for each pulse. The `claudepulse.env` file keeps it out of compose files, and entering it with `read -rs` keeps it out of your shell history. Anyone who can run `docker inspect` on the host can still read it, so keep that host private and renew the token every year.
 
+**How is the container locked down?** It runs as an unprivileged user and uses no Linux capability, so the compose files in this repository drop all of them and forbid gaining privileges. A compose file or a Portainer stack of your own can do the same:
+
+```yaml
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+```
+
 **Where should it run?** Anywhere that stays on: a NAS, a Raspberry Pi (the images are built for `arm64`), a small server. It needs no Claude login on the machine, only the token.
 
 | You see in the logs or on Discord | It means | What to do |

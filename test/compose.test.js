@@ -34,3 +34,13 @@ test("the env file is never committed or sent to a build", () => {
     assert.match(text, /^claudepulse\.env$/m, name);
   }
 });
+
+// The image runs as an unprivileged user from start to finish and uses no
+// capability, so the container can give up all of them and refuse to gain any.
+test("compose files drop every capability and forbid gaining privileges", () => {
+  for (const name of COMPOSE_FILES) {
+    const text = fs.readFileSync(name, "utf8");
+    assert.match(text, /\n\s+cap_drop:\n\s+- ALL\n/, `${name}: cap_drop`);
+    assert.match(text, /\n\s+security_opt:\n\s+- no-new-privileges:true\n/, `${name}: security_opt`);
+  }
+});

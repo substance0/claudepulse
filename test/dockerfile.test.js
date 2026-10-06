@@ -58,3 +58,10 @@ test("creates a writable /data for the state file before dropping root", () => {
   assert.ok(createData > -1, "/data is not created");
   assert.ok(createData < dropRoot, "/data must be created before USER claudepulse");
 });
+
+test("the image runs as an unprivileged user, never root again", () => {
+  const text = dockerfile();
+  const users = [...text.matchAll(/^USER\s+(\S+)/gm)].map((match) => match[1]);
+  assert.equal(users.at(-1), "claudepulse", "the last USER must be claudepulse");
+  assert.ok(!users.slice(users.indexOf("claudepulse")).includes("root"), "root returns after USER claudepulse");
+});

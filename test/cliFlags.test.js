@@ -113,3 +113,26 @@ test("the script asks for the path of the CLI", () => {
   assert.equal(result.status, 2);
   assert.match(result.stdout + result.stderr, /usage/i);
 });
+
+test("a wrapped description line that starts with a flag does not count", () => {
+  // The option column holds declarations; a description that wraps onto a
+  // deeply indented line may begin with another flag's name.
+  const help = [
+    "  --output-format <format>              Output format (only works with --print):",
+    '                                        "text" or "stream-json" (needs',
+    "                                        --strict-mcp-config to ignore others)",
+    "  --tools <tools...>                    Specify the list of available tools",
+    "                                        --settings, --agents, --plugin-dir.",
+    "  --verbose                             Override verbose mode setting",
+  ].join("\n");
+  assert.deepEqual(missingFlags(["--strict-mcp-config", "--settings"], help), [
+    "--strict-mcp-config",
+    "--settings",
+  ]);
+  assert.deepEqual(missingFlags(["--output-format", "--tools", "--verbose"], help), []);
+});
+
+test("options all sit in one column, wherever that column is", () => {
+  const help = "    --model <model>   Model\n    --verbose   Verbose\n        --tools   wrapped text\n";
+  assert.deepEqual(missingFlags(["--model", "--verbose", "--tools"], help), ["--tools"]);
+});

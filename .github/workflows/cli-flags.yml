@@ -1,10 +1,12 @@
 name: CLI flags
 
 # Checks that the Claude CLI pinned in docker/claude-cli still lists every flag
-# a pulse passes it, before a bump of that pin is merged. A pulse is lean only
-# because of those flags, so a CLI that renamed or dropped one would make
-# pulses costly or fail. The check reads the CLI's --help: it proves a flag
-# exists, not that it behaves as before. To run it locally,
+# a pulse passes it, on the pull request that bumps that pin. A pulse is lean
+# only because of those flags, so a CLI that renamed or dropped one would make
+# pulses costly or fail. This is a signal on the pull request, not a required
+# status: whoever merges a bump has to read it. The check reads the CLI's
+# --help, so it proves a flag exists, not that it behaves as before. To run it
+# locally,
 #   npm ci --omit=dev --prefix docker/claude-cli
 #   node scripts/check-cli-flags.mjs docker/claude-cli/node_modules/.bin/claude
 on:

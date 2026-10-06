@@ -29,18 +29,26 @@ export function flagsOf(args) {
 }
 
 /**
- * The options a help text declares. An option is declared in the part of a
- * line that comes before the description column, so a flag that is only
- * mentioned in a description, or is the start of a longer flag, is not.
+ * The options a help text declares. Options sit in one column, the shallowest
+ * indent among the lines that start with a dash, and a declaration is the part
+ * of such a line before the description column. A flag that is only mentioned
+ * in a description, even at the start of a wrapped line that is indented
+ * deeper, or that is the start of a longer flag, is not declared.
  * @param {string} helpText - Output of `claude --help`
  * @returns {Set<string>} Short and long option names
  */
 function declaredFlags(helpText) {
-  const declared = new Set();
+  const candidates = [];
   for (const line of helpText.split("\n")) {
-    const declaration = line.match(/^\s+(-\S.*?)(?:\s{2,}|$)/);
-    if (!declaration) continue;
-    for (const token of declaration[1].split(/[\s,]+/)) {
+    const candidate = line.match(/^(\s+)(-\S.*?)(?:\s{2,}|$)/);
+    if (candidate) candidates.push({ indent: candidate[1].length, declaration: candidate[2] });
+  }
+  const optionColumn = Math.min(...candidates.map((candidate) => candidate.indent));
+
+  const declared = new Set();
+  for (const { indent, declaration } of candidates) {
+    if (indent !== optionColumn) continue;
+    for (const token of declaration.split(/[\s,]+/)) {
       if (token.startsWith("-")) declared.add(token.split("=")[0]);
     }
   }

@@ -41,7 +41,7 @@ npm test               # node --test, built-ins only
 npm run check:syntax   # node --check on every source, script and test file
 ```
 
-Pull requests also lint the workflow files with actionlint and scan the whole history for secrets. One that changes the pinned Claude CLI or the pulse arguments also checks that the CLI still lists every flag a pulse passes: `npm ci --omit=dev --prefix docker/claude-cli`, then `node scripts/check-cli-flags.mjs docker/claude-cli/node_modules/.bin/claude`.
+Pull requests also lint the workflow files with actionlint and scan the whole history for secrets. One that changes the pinned Claude CLI or the pulse arguments also checks that the CLI still lists every flag a pulse passes: `npm ci --omit=dev --prefix docker/claude-cli`, then `node scripts/check-cli-flags.mjs docker/claude-cli/node_modules/.bin/claude`. It is not a required status, so merge a CLI bump only when that check is green.
 
 ### Secret Scanning
 

@@ -90,10 +90,10 @@ pulse comes sooner, a startup warning explains that mornings may start with
 fewer hours left, and suggests an earlier `WORK_END` or switching work hours
 off.
 
-`WORK_END` is the last moment a window may start, not the time you stop
-working: a window opened before it runs its full 5 hours, and you can keep
-working inside it. If you also work in a separate late session, set `WORK_END`
-later. With `WORK_START=09:00`, `HOURS_LEFT_AT_START=2` and `WORK_END=23:59`,
+`WORK_END` limits when pulses may start a window, not when you stop working: a
+pulse due at or after it waits for the next working day, and a window opened
+before it runs its full 5 hours, so you can keep working inside it. If you also
+work in a separate late session, set `WORK_END` later. With `WORK_START=09:00`, `HOURS_LEFT_AT_START=2` and `WORK_END=23:59`,
 the chain gains a pulse at 21:00:10 whose window resets at 02:00, so a session
 that starts at midnight finds 2 hours left. Nothing pulses between 02:00 and
 the next day's first pulse at 06:00:10.

@@ -257,6 +257,12 @@ ClaudePulse can post to two Discord webhooks:
 - **Errors and alerts** (`DISCORD_ERROR_WEBHOOK_URL`, formerly `DISCORD_WEBHOOK_URL`, whose old name is now ignored): failed pulses and other errors, spaced out during an outage, plus token expiry warnings when `TOKEN_EXPIRES_AT` is set, and an "Extra usage in use" alert when a pulse ran on paid extra usage credits. Keep it on a channel you do not mute.
 - **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, "Weekly limit reached" with the date it lifts, or "Extra usage in use" when the pulse ran on paid credits instead. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
 
+<p align="center">
+  <img src="assets/discord-window-open.jpg" alt="A Discord message titled Personal · Window open: the current window resets at 11:00, weekly usage 56%" width="520">
+</p>
+
+<p align="center"><em>The window notification for an account labelled <code>Personal</code>. Discord shows the relative times ("in 2 hours") in your own language, counted from when you look.</em></p>
+
 To set one up:
 
 1. **Create the webhook**: Discord Server → Settings → Integrations → Webhooks → New Webhook, then copy its URL.

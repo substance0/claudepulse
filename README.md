@@ -6,7 +6,7 @@
 
 **Opens each new Claude Pro/Max 5-hour window right after the previous one resets, so a window is already running when you sit down to code.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/license/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Version](https://img.shields.io/github/v/release/substance0/claudepulse)](https://github.com/substance0/claudepulse/releases)
 [![Docker Edge](https://github.com/substance0/claudepulse/actions/workflows/docker-edge.yml/badge.svg)](https://github.com/substance0/claudepulse/actions/workflows/docker-edge.yml)
@@ -33,7 +33,7 @@ Claude's 5-hour windows don't start on their own when the previous one resets. A
 
 ## Quick Start
 
-You need a Claude Pro or Max account, and Docker (or Podman) on a machine that stays on: a NAS, a Raspberry Pi with a 64-bit OS, a small server. To create the token you also need the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview), once, on any machine with a browser.
+You need a Claude Pro or Max account, and Docker (or Podman) on a machine that stays on: a NAS, a Raspberry Pi with a 64-bit OS, a small server. To create the token you also need the [Claude Code CLI](https://code.claude.com/docs/en/overview), once, on any machine with a browser.
 
 ```bash
 claude setup-token   # prints a token valid for one year
@@ -109,7 +109,7 @@ WORK_DAYS=Mon-Fri
 
 All installation paths read secrets from a `claudepulse.env` file. Create it once.
 
-**1. Generate a token** with the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/overview), on any machine with a browser. It is valid for one year:
+**1. Generate a token** with the [Claude Code CLI](https://code.claude.com/docs/en/overview), on any machine with a browser. It is valid for one year:
 
 ```bash
 claude setup-token

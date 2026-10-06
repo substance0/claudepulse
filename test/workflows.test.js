@@ -286,3 +286,28 @@ test("Dependabot never proposes an odd-numbered Node major", () => {
   }
   assert.match(text, /dependency-name: node/);
 });
+
+test("the CLI flag check runs when the pinned CLI or the pulse arguments change", () => {
+  const text = read("cli-flags.yml");
+  assert.match(text, /^on:\n\s+pull_request:/m);
+  for (const path of [
+    "docker/claude-cli/**",
+    "src/features/claude/executor/**",
+    "scripts/check-cli-flags.mjs",
+  ]) {
+    assert.ok(text.includes(`"${path}"`), path);
+  }
+});
+
+test("the CLI flag check gets a read-only token and no secrets", () => {
+  const text = read("cli-flags.yml");
+  assert.match(text, /^permissions:\n\s+contents: read$/m);
+  assert.doesNotMatch(text, /pull_request_target/);
+  assert.doesNotMatch(text, /secrets\./);
+});
+
+test("the CLI flag check runs the pinned CLI from its lockfile", () => {
+  const text = read("cli-flags.yml");
+  assert.match(text, /working-directory: docker\/claude-cli\n\s+run: npm ci/);
+  assert.match(text, /node scripts\/check-cli-flags\.mjs docker\/claude-cli\/node_modules\/\.bin\/claude/);
+});

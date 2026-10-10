@@ -3,12 +3,15 @@ name: Dependabot auto-merge
 # Merges the open Dependabot pull requests that scripts/dependabot-eligibility.mjs
 # finds safe: only patch and minor updates to the release tooling or the
 # workflow actions, with every check passed. The Claude CLI, the Dockerfile and
-# major updates are left to a person. It sweeps on a schedule, from the default
-# branch, so nothing waits inside a pull request run and no branch protection is
-# needed.
+# major updates are left to a person. It runs when a check workflow finishes on
+# a Dependabot pull request, so the last check to finish finds the others
+# passed and the merge follows; a run for any other author is skipped. It runs
+# from the default branch, so it never executes code from a pull request.
+# workflow_dispatch sweeps on demand.
 on:
-  schedule:
-    - cron: "23 */6 * * *"
+  workflow_run:
+    workflows: ["PR Checks", "Links", "CLI flags", "CodeQL"]
+    types: [completed]
   workflow_dispatch:
 
 permissions: {}
@@ -19,6 +22,7 @@ concurrency:
 
 jobs:
   sweep:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.actor.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

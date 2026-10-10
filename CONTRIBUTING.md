@@ -158,7 +158,7 @@ gh workflow run docker-release-rebuild.yml -f tag=vX.Y.Z
 | `cli-flags.yml`              | pinned CLI or pulse arguments change | the pinned CLI still lists every flag a pulse passes |
 | `claude.yml`                 | `@claude` in an issue or pull request | answers and edits, for people with write access |
 | `claude-review.yml`          | pull request opened or ready | one review of changes to code           |
-| `dependabot-automerge.yml`   | every 6 hours, on demand   | merges Dependabot pull requests that are safe and green |
+| `dependabot-automerge.yml`   | a check finishes on a Dependabot pull request, on demand | merges Dependabot pull requests that are safe and green |
 | `release.yml`                | push to `main`             | tests, semantic-release, release image    |
 | `docker-edge.yml`            | push to `main`             | `edge` image                              |
 | `docker-snapshot.yml`        | on demand                  | `snapshot-<branch>` image                 |
@@ -180,7 +180,7 @@ gh variable set CLAUDE_AUTOMATION --body true
 
 Comment `@claude` followed by a request on an issue or pull request. Only the owner, members and collaborators can trigger it. The cost of a run is bounded by `--model`, `--max-turns` and the job timeout in each workflow's `claude_args`. A pull request that changes code is reviewed once, when it opens or leaves draft, unless it is a draft, comes from a fork or comes from Dependabot; comment `@claude review this` for another look. The repository's `CLAUDE.md` holds the rules Claude follows, including no attribution in commits.
 
-`dependabot-automerge.yml` sweeps the open Dependabot pull requests every 6 hours and squash-merges those that `scripts/dependabot-eligibility.mjs` finds safe: only patch and minor updates to the root `package.json` and `package-lock.json` or to workflow actions, with every check passed. Its tests use the shapes of real pull requests. The Claude CLI in `docker/claude-cli`, the Dockerfile and every major update wait for a person, because they decide how pulses run. It runs from the default branch on a schedule, not after the checks finish: a workflow never starts on another workflow's completion, and `pr-checks.yml` keeps a read-only token. A merge made with the workflow's token does not start the push workflows, which is fine for updates that change no image input.
+`dependabot-automerge.yml` sweeps the open Dependabot pull requests whenever `PR Checks`, `Links`, `CLI flags` or `CodeQL` finishes on a Dependabot pull request, and squash-merges those that `scripts/dependabot-eligibility.mjs` finds safe: only patch and minor updates to the root `package.json` and `package-lock.json` or to workflow actions, with every check passed. Its tests use the shapes of real pull requests. The Claude CLI in `docker/claude-cli`, the Dockerfile and every major update wait for a person, because they decide how pulses run. It starts on a check workflow's completion, so the last check to finish finds the others passed and the merge follows; runs for other authors are skipped. It runs from the default branch and declares its own write permissions, while `pr-checks.yml` keeps a read-only token. No other workflow starts on another workflow's completion. A merge made with the workflow's token does not start the push workflows, which is fine for updates that change no image input.
 
 ## Need Help?
 

@@ -131,8 +131,9 @@ test("callers never mention latest", () => {
   }
 });
 
-test("nothing is triggered by another workflow finishing", () => {
+test("only the Dependabot sweep is triggered by another workflow finishing", () => {
   for (const name of fs.readdirSync(".github/workflows")) {
+    if (name === "dependabot-automerge.yml") continue;
     assert.doesNotMatch(read(name), /workflow_run/, name);
   }
 });
@@ -277,6 +278,19 @@ test("Dependabot pull requests are merged only after the eligibility script says
   assert.doesNotMatch(text, /pull_request_target/);
   // A merge must follow the check, so the script's exit code gates it.
   assert.match(text, /if gh pr view .*dependabot-eligibility\.mjs; then\s+gh pr merge/s);
+});
+
+test("the Dependabot sweep follows the pull request checks and ignores other authors", () => {
+  const text = read("dependabot-automerge.yml");
+  assert.match(text, /^on:\n\s+workflow_run:/m);
+  assert.match(text, /workflows: \["PR Checks", "Links", "CLI flags", "CodeQL"\]/);
+  assert.match(text, /types: \[completed\]/);
+  assert.match(text, /workflow_dispatch:/);
+  assert.doesNotMatch(text, /schedule:|cron:/);
+  assert.match(
+    text,
+    /if: github\.event_name == 'workflow_dispatch' \|\| github\.event\.workflow_run\.actor\.login == 'dependabot\[bot\]'/,
+  );
 });
 
 test("Dependabot never proposes an odd-numbered Node major", () => {

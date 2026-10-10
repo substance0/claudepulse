@@ -120,7 +120,7 @@ build(deps): bump @anthropic-ai/claude-code in /docker/claude-cli
 ### What a Merge to `main` Does
 
 1. **PR Checks** have already passed on the pull request.
-2. **Release** (`release.yml`) runs the tests, then semantic-release. When the commits call for a release it tags `vX.Y.Z`, updates `package.json` and `CHANGELOG.md`, and creates the GitHub Release.
+2. **Release** (`release.yml`) runs the tests, then semantic-release. When the commits call for a release it tags `vX.Y.Z`, updates `package.json`, `package-lock.json` and `CHANGELOG.md`, and creates the GitHub Release.
 3. **Image builds** publish to `ghcr.io/substance0/claudepulse`: every commit gets an `edge` image, and a release also gets `latest` and its version tags.
 
 The published tags are listed in the README's [Image Tags](README.md#image-tags).

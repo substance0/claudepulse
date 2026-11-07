@@ -1,3 +1,10 @@
+## [2.9.1](https://github.com/substance0/claudepulse/compare/v2.9.0...v2.9.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* do not shift a pulse refused at the weekly limit ([#33](https://github.com/substance0/claudepulse/issues/33)) ([7396dd6](https://github.com/substance0/claudepulse/commit/7396dd63c43e3f589285fb7187624039a736b633))
+
 # [2.9.0](https://github.com/substance0/claudepulse/compare/v2.8.0...v2.9.0) (2026-11-07)
 
 

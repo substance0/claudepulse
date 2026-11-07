@@ -1,3 +1,10 @@
+# [2.9.0](https://github.com/substance0/claudepulse/compare/v2.8.0...v2.9.0) (2026-11-07)
+
+
+### Features
+
+* handle the window the weekly reset opens ([#32](https://github.com/substance0/claudepulse/issues/32)) ([3084dac](https://github.com/substance0/claudepulse/commit/3084dac35f672e99d92a845a38732405e32ed98d))
+
 # [2.8.0](https://github.com/substance0/claudepulse/compare/v2.7.0...v2.8.0) (2026-10-05)
 
 

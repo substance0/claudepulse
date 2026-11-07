@@ -103,7 +103,10 @@ function buildScheduler(notifier, limit, workHours) {
     error() {},
     startTimer: () => ({ end() {} }),
     endTimer: () => ({ ms: 1 }),
-    logScheduler() {},
+    logScheduler(event, data) {
+      logger.logged.push({ event, ...data });
+    },
+    logged: [],
     child() {
       return logger;
     },
@@ -115,6 +118,7 @@ function buildScheduler(notifier, limit, workHours) {
     notifier,
     workHours,
   });
+  scheduler.logged = logger.logged;
   scheduler.running = true;
   scheduler.rateLimit = limit;
   return scheduler;
@@ -153,6 +157,7 @@ test("the scheduler moves the pulse to the end of the window the weekly reset op
   assert.equal(scheduler.lastScheduledTime.getTime(), windowEnd + 10 * 1000);
   assert.equal(warned.length, 1);
   assert.equal(warned[0].nextPulseAt.getTime(), windowEnd + 10 * 1000);
+  assert.equal(scheduler.logged.at(-1).strategy, "weekly_reset");
   assert.ok(warned[0].plannedAt instanceof Date);
 });
 
@@ -170,6 +175,28 @@ test("the scheduler warns once per weekly reset", async () => {
   clearTimeout(scheduler.timer);
 
   assert.equal(warned.length, 1);
+});
+
+test("the scheduler does not shift a pulse refused at the weekly limit", async () => {
+  const warned = [];
+  const now = Date.now();
+  const resetsAt = new Date(now + 3.5 * HOUR_MS);
+  const limit = {
+    status: "rejected",
+    resetsAt,
+    fiveHourResetsAt: new Date(now + 3 * HOUR_MS),
+    weekly: { utilization: 1, resetsAt },
+  };
+  const scheduler = buildScheduler(
+    { notify: async () => {}, notifyWeeklyShift: async (s) => warned.push(s) },
+    limit,
+  );
+
+  await scheduler._scheduleNext();
+  clearTimeout(scheduler.timer);
+
+  assert.equal(scheduler.lastScheduledTime.getTime(), resetsAt.getTime() + 10 * 1000);
+  assert.equal(warned.length, 0);
 });
 
 test("the shifted time is held to work hours too", async () => {

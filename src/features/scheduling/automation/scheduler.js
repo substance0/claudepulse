@@ -163,8 +163,8 @@ export class PulseScheduler {
     this.fixedIntervalMs = 5 * 60 * 60 * 1000; // 5 hours
     // Latest rate-limit state reported by a pulse; drives scheduling
     this.rateLimit = null;
-    // Weekly reset (epoch ms) already warned about, so a restart or a
-    // reschedule does not repeat the heads-up
+    // Weekly reset (epoch ms) already warned about, so a reschedule does not
+    // repeat the heads-up. Kept in memory only: a restart warns again.
     this.warnedWeeklyReset = null;
     // Names of unknown rate-limit field sets already logged
     this.reportedFieldSets = new Set();
@@ -530,7 +530,7 @@ export class PulseScheduler {
 
   /**
    * Tell the user ahead of time that the weekly limit's reset opens a window
-   * the planned pulse would land in, once per weekly reset.
+   * the planned pulse would land in, once per weekly reset and process.
    * @param {{weeklyResetAt: Date, windowEnd: Date, plannedAt: Date, nextPulseAt: Date}} shift
    */
   _warnWeeklyShift(shift) {
@@ -735,7 +735,17 @@ export class PulseScheduler {
     // The weekly reset opens a window of its own. A pulse that would land in
     // it opens nothing, so it waits for the window to end, still inside
     // working hours.
-    const shift = weeklyResetShift(this.rateLimit, finalTime);
+    // A pulse refused at the weekly limit already targets that reset: it
+    // confirms the new window, so it is not shifted.
+    const weeklyResetAt = this.rateLimit?.weekly?.resetsAt;
+    const targetsWeeklyReset =
+      this.rateLimit?.status === "rejected" &&
+      weeklyResetAt instanceof Date &&
+      this.rateLimit.resetsAt instanceof Date &&
+      this.rateLimit.resetsAt.getTime() === weeklyResetAt.getTime();
+    const shift = targetsWeeklyReset
+      ? null
+      : weeklyResetShift(this.rateLimit, finalTime);
     if (shift) {
       const plannedAt = finalTime;
       finalTime = shift.nextPulseAt;

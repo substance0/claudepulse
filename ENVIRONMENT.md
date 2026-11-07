@@ -523,7 +523,8 @@ reset time is visible from a phone.
   it opens (within 5 hours), that pulse would open nothing. It moves to 10
   seconds after the weekly window ends, still inside working hours, and the
   log names the strategy `weekly_reset`. A "Next window will shift" message
-  is posted right away, once per weekly reset, with the weekly reset, the
+  is posted right away, once per weekly reset and per process (a restart can
+  repeat it), with the weekly reset, the
   end of the window it opens, the pulse it displaces and the new pulse time,
   as absolute times, so you can plan your day. The window at the weekly reset
   is an observation, not documented behaviour; the shift needs

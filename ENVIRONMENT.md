@@ -526,7 +526,11 @@ reset time is visible from a phone.
   is posted right away, once per weekly reset and per process (a restart can
   repeat it), with the weekly reset, the
   end of the window it opens, the pulse it displaces and the new pulse time,
-  as absolute times, so you can plan your day. The window at the weekly reset
+  as absolute times, so you can plan your day. A pulse that was refused at
+  the weekly limit already targets the weekly reset and opens that window, so
+  it stays there, with no shift and no message. If work hours moved it later,
+  into the window it opened, it is shifted like any other pulse. The window at
+  the weekly reset
   is an observation, not documented behaviour; the shift needs
   `weekly.resetsAt` in the pulse's response and follows from it.
 - A scheduled pulse that finds a window that started more than 10 minutes

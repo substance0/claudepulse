@@ -212,3 +212,41 @@ test("a window notifier without the heads-up method does not break scheduling", 
   await assert.doesNotReject(scheduler._scheduleNext());
   clearTimeout(scheduler.timer);
 });
+
+test("a pulse refused at the weekly limit stays planned at the reset and sends no heads-up", async () => {
+  const warned = [];
+  const strategies = [];
+  const now = Date.now();
+  const resetAt = new Date(now + 2 * HOUR_MS);
+  const limit = {
+    status: "rejected",
+    resetsAt: resetAt,
+    fiveHourResetsAt: new Date(now + 1 * HOUR_MS),
+    weekly: { utilization: 1, resetsAt: resetAt },
+  };
+  const scheduler = buildScheduler(
+    { notify: async () => {}, notifyWeeklyShift: async (s) => warned.push(s) },
+    limit,
+    null,
+  );
+  scheduler.logger.logScheduler = (event, data) => strategies.push(data?.strategy);
+
+  await scheduler._scheduleNext();
+  clearTimeout(scheduler.timer);
+
+  assert.equal(scheduler.lastScheduledTime.getTime(), resetAt.getTime() + 10 * 1000);
+  assert.equal(warned.length, 0);
+  assert.deepEqual(strategies, ["window_reset"]);
+});
+
+test("the log names the weekly_reset strategy when the pulse is shifted", async () => {
+  const strategies = [];
+  const { limit, workHours } = scenario();
+  const scheduler = buildScheduler({ notify: async () => {} }, limit, workHours);
+  scheduler.logger.logScheduler = (event, data) => strategies.push(data?.strategy);
+
+  await scheduler._scheduleNext();
+  clearTimeout(scheduler.timer);
+
+  assert.deepEqual(strategies, ["weekly_reset"]);
+});

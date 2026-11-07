@@ -518,6 +518,14 @@ reset time is visible from a phone.
   limit lifts. Pulsing resumes on its own at that time. If the pulse instead
   ran on paid extra usage, it posts "Extra usage in use" in their place.
 - "Window open" also shows weekly usage and when the weekly window resets.
+- Posts "Next window will shift" when the weekly limit resets after the
+  current window ends and before the next planned pulse, within 5 hours of
+  it. A window has been seen to start at the weekly reset, so the pulse would
+  find it already running and the next window would open when it ends. The
+  message gives the weekly reset, the expected window end and the pulse it
+  displaces, as absolute times, once per weekly reset. It is an expectation,
+  not a guarantee: the window at the weekly reset is an observation, not
+  documented behaviour. The schedule itself is unchanged.
 - Uses a webhook of its own. Create it in a dedicated channel, then mute or
   unmute that channel in Discord to turn announcements off and on without
   touching error alerts.

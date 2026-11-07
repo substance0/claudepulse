@@ -79,3 +79,13 @@ test("says when a dry run's schedule is resumed from a saved one", () => {
   assert.match(line, /scheduled_for=/);
   assert.match(line, /resumed from saved schedule/);
 });
+
+test("shows when the weekly window resets after a successful pulse", () => {
+  const line = formatPulse({
+    windowResetsAt: "2026-09-24T13:50:00.000Z",
+    weeklyUsage: 0.2,
+    weeklyResetsAt: "2026-09-28T03:00:00.000Z",
+  });
+
+  assert.match(line, /weekly_resets=/);
+});

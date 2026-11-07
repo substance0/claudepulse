@@ -209,6 +209,11 @@ export class Logger {
         if (Number.isFinite(data.weeklyUsage)) {
           parts.push(`weekly=${Math.round(data.weeklyUsage * 100)}%`);
         }
+        if (data.weeklyResetsAt) {
+          parts.push(
+            `weekly_resets=${DateUtility.formatLocalIso(new Date(data.weeklyResetsAt))}`,
+          );
+        }
         if (data.cost !== undefined) parts.push(`cost=${data.cost}`);
         return parts.join(", ");
       }

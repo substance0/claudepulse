@@ -1,6 +1,12 @@
 import { DateUtility } from "../../../core/utils/DateUtility.js";
-import { SchedulingStrategyManager } from "../strategy/scheduling-strategies.js";
-import { blockingLimit } from "../../../core/services/windowNotification.js";
+import {
+  SchedulingStrategyManager,
+  weeklyResetShift,
+} from "../strategy/scheduling-strategies.js";
+import {
+  blockingLimit,
+  windowStartedBefore,
+} from "../../../core/services/windowNotification.js";
 
 /**
  * Claude Session Automation Scheduler
@@ -157,6 +163,9 @@ export class PulseScheduler {
     this.fixedIntervalMs = 5 * 60 * 60 * 1000; // 5 hours
     // Latest rate-limit state reported by a pulse; drives scheduling
     this.rateLimit = null;
+    // Weekly reset (epoch ms) already warned about, so a restart or a
+    // reschedule does not repeat the heads-up
+    this.warnedWeeklyReset = null;
     // Names of unknown rate-limit field sets already logged
     this.reportedFieldSets = new Set();
 
@@ -250,6 +259,7 @@ export class PulseScheduler {
           sessionId: result.message?.session_id,
           windowResetsAt: result.rateLimit?.fiveHourResetsAt?.toISOString(),
           weeklyUsage: result.rateLimit?.weekly?.utilization ?? undefined,
+          weeklyResetsAt: result.rateLimit?.weekly?.resetsAt?.toISOString(),
           usingOverage:
             result.rateLimit?.overage?.using === true ? true : undefined,
           timerDurationMs: duration?.ms,
@@ -314,7 +324,7 @@ export class PulseScheduler {
    * @param {Object} pulseResult - Result from _sendPulse()
    * @returns {Object} The same result, with `limitReached` set
    */
-  _processPulseResult(pulseResult) {
+  _processPulseResult(pulseResult, { scheduled = false } = {}) {
     // Keep the last reported window until a pulse reports a new one. A
     // transient failure mid-window does not change when the window resets,
     // and a reset that has passed is ignored when scheduling.
@@ -326,6 +336,22 @@ export class PulseScheduler {
     if (pulseResult.success) {
       this.consecutiveFailures = 0;
       this.lastSuccessTime = new Date();
+    }
+
+    // A scheduled pulse is meant to open the window; the notifier needs to
+    // know it, and when it ran, to tell whether it did.
+    const sentAt = new Date();
+    if (scheduled) {
+      pulseResult = { ...pulseResult, scheduled: true, sentAt };
+      const started = pulseResult.success
+        ? windowStartedBefore(pulseResult.rateLimit, sentAt)
+        : null;
+      if (started) {
+        this.logger.warn(
+          "pulse",
+          `The pulse opened no window: one started at ${DateUtility.formatLocalIso(started)}, opened by something else on the account`,
+        );
+      }
     }
 
     this._notify(pulseResult);
@@ -503,6 +529,35 @@ export class PulseScheduler {
   }
 
   /**
+   * Tell the user ahead of time that the weekly limit's reset opens a window
+   * the planned pulse would land in, once per weekly reset.
+   * @param {{weeklyResetAt: Date, windowEnd: Date, plannedAt: Date, nextPulseAt: Date}} shift
+   */
+  _warnWeeklyShift(shift) {
+    if (this.warnedWeeklyReset === shift.weeklyResetAt.getTime()) {
+      return;
+    }
+    this.warnedWeeklyReset = shift.weeklyResetAt.getTime();
+
+    this.logger.warn(
+      "schedule",
+      `Weekly reset at ${DateUtility.formatLocalIso(shift.weeklyResetAt)} opens a window ending ${DateUtility.formatLocalIso(shift.windowEnd)}: the pulse planned for ${DateUtility.formatLocalIso(shift.plannedAt)} moves to ${DateUtility.formatLocalIso(shift.nextPulseAt)}`,
+    );
+
+    const notifier = this.notifier;
+    if (typeof notifier?.notifyWeeklyShift !== "function") {
+      return;
+    }
+    Promise.resolve()
+      .then(() => notifier.notifyWeeklyShift(shift))
+      .catch((error) => {
+        this.logger.warn("notify", "Weekly shift notification failed", {
+          error: error.message,
+        });
+      });
+  }
+
+  /**
    * Count a failed cycle and report it. Counting cycles rather than attempts
    * keeps the count on the alert schedule: counting three attempts per cycle
    * gave 3, 6, 9... which never reaches a power of two, so a sustained
@@ -573,7 +628,9 @@ export class PulseScheduler {
         return;
       }
 
-      const result = this._processPulseResult(await this._sendPulse());
+      const result = this._processPulseResult(await this._sendPulse(), {
+        scheduled: true,
+      });
 
       if (result.success) {
         this.logger.info("cycle", "Pulse cycle completed successfully");
@@ -674,6 +731,19 @@ export class PulseScheduler {
         finalTime = allowed;
         strategy = "work_hours";
       }
+    }
+    // The weekly reset opens a window of its own. A pulse that would land in
+    // it opens nothing, so it waits for the window to end, still inside
+    // working hours.
+    const shift = weeklyResetShift(this.rateLimit, finalTime);
+    if (shift) {
+      const plannedAt = finalTime;
+      finalTime = shift.nextPulseAt;
+      strategy = "weekly_reset";
+      if (this.workHours) {
+        finalTime = this.workHours.nextAllowed(finalTime);
+      }
+      this._warnWeeklyShift({ ...shift, plannedAt, nextPulseAt: finalTime });
     }
     this.lastScheduledTime = finalTime;
     await this._saveState(finalTime, basis);

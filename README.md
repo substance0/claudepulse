@@ -96,7 +96,7 @@ WORK_DAYS=Mon-Fri
 | **Window-Aware Scheduling**   | Follows the reported window reset, waits out usage limits, and respects a configured start hour ([strategies](docs/workflow-diagrams.md#3-scheduling-strategy-selection)) |
 | **Work Hours** (opt-in)       | Starts your working day with a window that has the hours you choose left, so the morning can get two budgets; no pulses at night or on days off ([how](#work-hours-two-budgets-in-the-morning)) |
 | **Resume After Restart**      | With `STATE_DIR`, a restart or an upgrade resumes the planned pulse instead of sending a new one                                      |
-| **Window Notifications**      | Optional Discord message each time a window opens (with weekly usage) or a 5-hour or weekly limit is reached, with reset times in your local time zone |
+| **Window Notifications**      | Optional Discord message each time a window opens (with weekly usage) or a 5-hour or weekly limit is reached, with reset times in your local time zone. It also warns when a window was opened by something else, and ahead of time when the weekly reset will shift the next window |
 | **Extra Usage Alert**         | Tells you, in the log and (with a webhook) on Discord, when a pulse ran on paid extra usage credits                                  |
 | **Token Expiry Warnings**     | Optional Discord warnings 14, 7 and 1 day before your token expires, and once it has                                                 |
 | **Spaced Failure Alerts**     | Optional Discord alerts on the 1st, 2nd, 4th, 8th consecutive failure and so on, so an outage stays visible without flooding the channel |
@@ -177,7 +177,7 @@ For development setup, tests and the release process, see [CONTRIBUTING.md](CONT
 
 ```bash
 docker logs -f claudepulse
-# [INFO] [PULSE] Pulse successful (window_resets=…, weekly=20%, cost=…)
+# [INFO] [PULSE] Pulse successful (window_resets=…, weekly=20%, weekly_resets=…, cost=…)
 # [INFO] [STRATEGY] Strategy selected: window_reset → scheduling next pulse at …
 ```
 
@@ -255,7 +255,7 @@ The ones most setups touch:
 ClaudePulse can post to two Discord webhooks:
 
 - **Errors and alerts** (`DISCORD_ERROR_WEBHOOK_URL`, formerly `DISCORD_WEBHOOK_URL`, whose old name is now ignored): failed pulses and other errors, spaced out during an outage, plus token expiry warnings when `TOKEN_EXPIRES_AT` is set, and an "Extra usage in use" alert when a pulse ran on paid extra usage credits. Keep it on a channel you do not mute.
-- **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, "Weekly limit reached" with the date it lifts, or "Extra usage in use" when the pulse ran on paid credits instead. Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
+- **Window notifications** (`DISCORD_WINDOW_WEBHOOK_URL`): "Window open" with the reset time and weekly usage, "Usage limit reached" with the time it lifts, "Weekly limit reached" with the date it lifts, or "Extra usage in use" when the pulse ran on paid credits instead. Two warnings explain a shifted day: "Window already open" when a pulse found a window that something else on your account had opened, and "Next window will shift" ahead of time when the weekly limit's reset will open a window before your next pulse (the pulse then moves to the end of that window). Handy for checking your window from a phone. Give it a channel of its own, so you can mute it without muting error alerts.
 
 <p align="center">
   <img src="assets/discord-window-open.jpg" alt="A Discord message titled Personal · Window open: the current window resets at 11:00, weekly usage 56%" width="520">
@@ -307,6 +307,8 @@ Both can share Discord webhooks: every message names its account. If you enable 
 **Does a pulse use my allowance?** Very little. A pulse is one short call on the cheapest model, with no tools and thinking off: under 200 tokens, a few hundredths of a cent at API prices. Each pulse logs its `cost=`.
 
 **What if I work outside my work hours?** You can: your first prompt opens a window yourself, as it would without ClaudePulse. One catch: a window you open yourself in the 5 hours before the day's first pulse moves that whole day. A prompt at 05:00, say, means the 06:00:10 pulse lands inside your window, so only 1 hour is left at 09:00 and the fresh window opens at 10:00. `WORK_END` limits when pulses may start a window, not when you stop working: a pulse due at or after it waits for the next working day, and a window opened before it runs its full 5 hours. If you also work late in a separate session, set `WORK_END` later: with `09:00`, 2 hours left and `WORK_END=23:59`, a pulse at 21:00:10 opens a window that resets at 02:00, so a session that starts at midnight finds 2 hours left.
+
+**Why did my day start later after the weekly reset?** The weekly limit's reset starts a window of its own, a few hours before your first pulse if it falls overnight. That pulse would open nothing, so ClaudePulse moves it to the end of that window: with a weekly reset at 04:00 and a first pulse planned at 07:30, the pulse moves to 09:00:10 and the windows follow from there (09:00, 14:00, 19:00). With `DISCORD_WINDOW_WEBHOOK_URL` set, "Next window will shift" tells you the evening before. Nothing can bring the window back to 07:30, since it already started at 04:00.
 
 **What is "extra usage"?** If your account allows paid extra usage and a limit is reached, Claude Code carries on with credits, and a pulse sent then is billed. ClaudePulse never skips a pulse over it; it tells you with a `Pulse ran on paid extra usage` warning in the log and, when a Discord webhook is set, an "Extra usage in use" message. The next pulse is planned for when the limit lifts, but a restart without `STATE_DIR`, or the first pulse at `SCHEDULED_START_HOUR`, can add one more before then.
 

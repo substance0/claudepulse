@@ -532,7 +532,10 @@ reset time is visible from a phone.
   into the window it opened, it is shifted like any other pulse. The window at
   the weekly reset
   is an observation, not documented behaviour; the shift needs
-  `weekly.resetsAt` in the pulse's response and follows from it.
+  `weekly.resetsAt` in the pulse's response and follows from it. A pulse
+  refused at the weekly limit and planned at that reset stays there, with no
+  shift and no message, because the refusal already confirms the new window;
+  a pulse that work hours moved later is still shifted.
 - A scheduled pulse that finds a window that started more than 10 minutes
   before it (a window starts 5 hours before it resets) opened nothing:
   something else on the account did. The notification is then "Window

@@ -199,6 +199,30 @@ test("the scheduler does not shift a pulse refused at the weekly limit", async (
   assert.equal(warned.length, 0);
 });
 
+test("the scheduler shifts a weekly-limit refusal that work hours moved into the opened window", async () => {
+  const now = Date.now();
+  const resetsAt = new Date(now + 3.5 * HOUR_MS);
+  const limit = {
+    status: "rejected",
+    resetsAt,
+    fiveHourResetsAt: new Date(now + 3 * HOUR_MS),
+    weekly: { utilization: 1, resetsAt },
+  };
+  const workStart = now + 4 * HOUR_MS;
+  const workHours = {
+    nextAllowed: (t) => (t.getTime() < workStart ? new Date(workStart) : t),
+  };
+  const scheduler = buildScheduler({ notify: async () => {} }, limit, workHours);
+
+  await scheduler._scheduleNext();
+  clearTimeout(scheduler.timer);
+
+  assert.equal(
+    scheduler.lastScheduledTime.getTime(),
+    resetsAt.getTime() + 5 * HOUR_MS + 10 * 1000,
+  );
+});
+
 test("the shifted time is held to work hours too", async () => {
   const { limit, windowEnd } = scenario();
   const nextMorning = windowEnd + 12 * HOUR_MS;

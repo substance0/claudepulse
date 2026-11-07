@@ -735,10 +735,12 @@ export class PulseScheduler {
     // The weekly reset opens a window of its own. A pulse that would land in
     // it opens nothing, so it waits for the window to end, still inside
     // working hours.
-    // A pulse refused at the weekly limit already targets that reset: it
-    // confirms the new window, so it is not shifted.
+    // A pulse refused at the weekly limit and planned at that reset confirms
+    // the new window, so it is not shifted. Work hours that moved it later
+    // put it inside the window, so it is shifted like any other pulse.
     const weeklyResetAt = this.rateLimit?.weekly?.resetsAt;
     const targetsWeeklyReset =
+      strategy !== "work_hours" &&
       this.rateLimit?.status === "rejected" &&
       weeklyResetAt instanceof Date &&
       this.rateLimit.resetsAt instanceof Date &&

@@ -523,11 +523,19 @@ reset time is visible from a phone.
   it opens (within 5 hours), that pulse would open nothing. It moves to 10
   seconds after the weekly window ends, still inside working hours, and the
   log names the strategy `weekly_reset`. A "Next window will shift" message
-  is posted right away, once per weekly reset, with the weekly reset, the
+  is posted right away, once per weekly reset and per process (a restart can
+  repeat it), with the weekly reset, the
   end of the window it opens, the pulse it displaces and the new pulse time,
-  as absolute times, so you can plan your day. The window at the weekly reset
+  as absolute times, so you can plan your day. A pulse that was refused at
+  the weekly limit already targets the weekly reset and opens that window, so
+  it stays there, with no shift and no message. If work hours moved it later,
+  into the window it opened, it is shifted like any other pulse. The window at
+  the weekly reset
   is an observation, not documented behaviour; the shift needs
-  `weekly.resetsAt` in the pulse's response and follows from it.
+  `weekly.resetsAt` in the pulse's response and follows from it. A pulse
+  refused at the weekly limit and planned at that reset stays there, with no
+  shift and no message, because the refusal already confirms the new window;
+  a pulse that work hours moved later is still shifted.
 - A scheduled pulse that finds a window that started more than 10 minutes
   before it (a window starts 5 hours before it resets) opened nothing:
   something else on the account did. The notification is then "Window

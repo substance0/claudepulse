@@ -23,6 +23,16 @@ function discordTime(date) {
 }
 
 /**
+ * Format a date as Discord timestamp markup showing only the time, in each
+ * reader's own time zone.
+ * @param {Date} date
+ * @returns {string}
+ */
+function discordShortTime(date) {
+  return `<t:${Math.floor(date.getTime() / 1000)}:t>`;
+}
+
+/**
  * @param {*} value
  * @returns {boolean}
  */
@@ -165,6 +175,19 @@ export function buildWindowNotification(pulseResult) {
   if (!pulseResult.success || !isValidDate(windowReset)) {
     return null;
   }
+  // A scheduled pulse is meant to open the window. One that found a window
+  // running opened nothing: something else on the account did, and the
+  // schedule now follows that window's end.
+  const started = pulseResult.scheduled
+    ? windowStartedBefore(rateLimit, pulseResult.sentAt)
+    : null;
+  if (started && windowReset === rateLimit.fiveHourResetsAt) {
+    return {
+      title: "Window already open",
+      description: `This pulse did not open the window: it started at ${discordShortTime(started)}, opened by something else on the account. It resets at ${discordShortTime(windowReset)}, and the next pulse follows.${weeklyUsageLine(rateLimit.weekly)}`,
+      level: "WARN",
+    };
+  }
   return {
     title: "Window open",
     description: `The current window resets at ${discordTime(windowReset)}.${weeklyUsageLine(rateLimit.weekly)}`,
@@ -173,10 +196,10 @@ export function buildWindowNotification(pulseResult) {
 }
 
 /**
- * Build the Discord payload warning that the weekly limit's reset is expected
- * to open a window ahead of the next pulse, which moves the next window.
+ * Build the Discord payload warning that the weekly limit's reset opens a
+ * window ahead of the planned pulse, so the pulse moves to the window's end.
  * Times are absolute: the message is read well before the reset.
- * @param {{weeklyResetAt: Date, windowEnd: Date, nextPulseAt: Date}} shift
+ * @param {{weeklyResetAt: Date, windowEnd: Date, plannedAt: Date, nextPulseAt: Date}} shift
  * @returns {{title: string, description: string, level: string}}
  */
 export function buildWeeklyShiftNotification(shift) {
@@ -184,10 +207,35 @@ export function buildWeeklyShiftNotification(shift) {
   return {
     title: "Next window will shift",
     description:
-      `The weekly limit resets <t:${epoch(shift.weeklyResetAt)}:f>, which is expected to open a window ending at <t:${epoch(shift.windowEnd)}:t>. ` +
-      `The pulse planned for <t:${epoch(shift.nextPulseAt)}:t> would find it already running, so the next window opens at about <t:${epoch(shift.windowEnd)}:t> instead.`,
+      `The weekly limit resets <t:${epoch(shift.weeklyResetAt)}:f> and starts a window that ends at <t:${epoch(shift.windowEnd)}:t>. ` +
+      `The pulse planned for <t:${epoch(shift.plannedAt)}:t> would find it already running, so it moves to <t:${epoch(shift.nextPulseAt)}:t> and the next window opens then.`,
     level: "WARN",
   };
+}
+
+/** How long before a pulse a window may start and still count as its own. */
+const OPENED_BY_PULSE_TOLERANCE_MS = 10 * 60 * 1000;
+
+/** Length of a usage window. */
+const WINDOW_MS = 5 * 60 * 60 * 1000;
+
+/**
+ * When a window that was already running at a pulse began, or null when the
+ * pulse opened it. A window starts 5 hours before it resets, so a window that
+ * began well before the pulse was opened by something else on the account.
+ * @param {?{fiveHourResetsAt: ?Date}} rateLimit
+ * @param {Date} sentAt - When the pulse was sent
+ * @returns {?Date}
+ */
+export function windowStartedBefore(rateLimit, sentAt) {
+  const windowEnd = rateLimit?.fiveHourResetsAt;
+  if (!isValidDate(windowEnd) || !isValidDate(sentAt)) {
+    return null;
+  }
+  const started = new Date(windowEnd.getTime() - WINDOW_MS);
+  return sentAt.getTime() - started.getTime() > OPENED_BY_PULSE_TOLERANCE_MS
+    ? started
+    : null;
 }
 
 /**

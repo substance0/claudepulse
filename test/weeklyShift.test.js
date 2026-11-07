@@ -23,12 +23,13 @@ function rateLimit(overrides = {}) {
   };
 }
 
-test("a weekly reset that lands before the next pulse shifts the next window", () => {
+test("a weekly reset that lands before the next pulse moves the pulse to the end of the window it opens", () => {
   const shift = weeklyResetShift(rateLimit(), at("07:30"));
 
   assert.deepEqual(shift, {
     weeklyResetAt: at("04:00"),
     windowEnd: at("09:00"),
+    nextPulseAt: new Date(at("09:00").getTime() + 10 * 1000),
   });
 });
 
@@ -36,8 +37,12 @@ test("no shift when the next pulse comes before the weekly reset", () => {
   assert.equal(weeklyResetShift(rateLimit(), at("03:30")), null);
 });
 
-test("no shift when the window the weekly reset would open has ended by the next pulse", () => {
+test("no shift once the pulse follows the window the weekly reset opens", () => {
   assert.equal(weeklyResetShift(rateLimit(), at("09:00")), null);
+  assert.equal(
+    weeklyResetShift(rateLimit(), new Date(at("09:00").getTime() + 10000)),
+    null,
+  );
 });
 
 test("no shift when a window is still open at the weekly reset", () => {
@@ -55,20 +60,23 @@ test("no shift when the weekly reset or the window is unknown", () => {
   );
 });
 
-const SHIFT = { weeklyResetAt: at("04:00"), windowEnd: at("09:00") };
+const SHIFT = {
+  weeklyResetAt: at("04:00"),
+  windowEnd: at("09:00"),
+  plannedAt: at("07:30"),
+  nextPulseAt: at("09:00"),
+};
 const epoch = (date) => date.getTime() / 1000;
 
-test("the heads-up names the weekly reset, the window it would open and the pulse it displaces", () => {
-  const payload = buildWeeklyShiftNotification({
-    ...SHIFT,
-    nextPulseAt: at("07:30"),
-  });
+test("the heads-up names the weekly reset, the window it opens, the pulse it displaces and the new pulse", () => {
+  const payload = buildWeeklyShiftNotification(SHIFT);
 
   assert.equal(payload.level, "WARN");
   assert.match(payload.title, /shift/i);
   assert.match(payload.description, new RegExp(`<t:${epoch(SHIFT.weeklyResetAt)}:f>`));
   assert.match(payload.description, new RegExp(`<t:${epoch(SHIFT.windowEnd)}:t>`));
-  assert.match(payload.description, new RegExp(`<t:${epoch(at("07:30"))}:t>`));
+  assert.match(payload.description, new RegExp(`<t:${epoch(SHIFT.plannedAt)}:t>`));
+  assert.match(payload.description, new RegExp(`<t:${epoch(SHIFT.nextPulseAt)}:t>`));
   // Absolute times only: a countdown goes stale in the channel history
   assert.doesNotMatch(payload.description, /:R>/);
 });
@@ -80,14 +88,14 @@ test("the window notifier posts the heads-up to its webhook", async () => {
     label: "Martin",
   });
 
-  await notifier.notifyWeeklyShift({ ...SHIFT, nextPulseAt: at("07:30") });
+  await notifier.notifyWeeklyShift(SHIFT);
 
   assert.equal(sent.length, 1);
   assert.equal(sent[0].url, "https://example.test/hook");
   assert.match(sent[0].payload.title, /^Martin · /);
 });
 
-function buildScheduler(notifier, limit) {
+function buildScheduler(notifier, limit, workHours) {
   const logger = {
     info() {},
     warn() {},
@@ -105,57 +113,101 @@ function buildScheduler(notifier, limit) {
     logger,
     config: { PROMPT_TEXT: "p", MAX_RETRIES: 1 },
     notifier,
+    workHours,
   });
   scheduler.running = true;
   scheduler.rateLimit = limit;
   return scheduler;
 }
 
-// A weekly reset 4 hours ahead and a window ending 3 hours ahead: the pulse
-// that follows the window falls inside the window the weekly reset opens.
-function shiftingLimit() {
+// A window ending in 3 hours and a weekly reset 30 minutes after it. Work
+// hours hold the next pulse until 4 hours from now, inside the window the
+// weekly reset opens.
+function scenario() {
   const now = Date.now();
-  return {
+  const limit = {
     status: "allowed",
     resetsAt: new Date(now + 3 * HOUR_MS),
     fiveHourResetsAt: new Date(now + 3 * HOUR_MS),
     weekly: { utilization: 0.4, resetsAt: new Date(now + 3.5 * HOUR_MS) },
   };
+  const workStart = now + 4 * HOUR_MS;
+  const workHours = {
+    nextAllowed: (t) => (t.getTime() < workStart ? new Date(workStart) : t),
+  };
+  return { limit, workHours, windowEnd: now + 8.5 * HOUR_MS };
 }
 
-test("the scheduler warns once per weekly reset when the next pulse would land in its window", async () => {
+test("the scheduler moves the pulse to the end of the window the weekly reset opens and says so", async () => {
   const warned = [];
+  const { limit, workHours, windowEnd } = scenario();
   const scheduler = buildScheduler(
     { notify: async () => {}, notifyWeeklyShift: async (s) => warned.push(s) },
-    shiftingLimit(),
+    limit,
+    workHours,
   );
-  scheduler.workHours = { nextAllowed: (t) => new Date(t.getTime() + HOUR_MS) };
+
+  await scheduler._scheduleNext();
+  clearTimeout(scheduler.timer);
+
+  assert.equal(scheduler.lastScheduledTime.getTime(), windowEnd + 10 * 1000);
+  assert.equal(warned.length, 1);
+  assert.equal(warned[0].nextPulseAt.getTime(), windowEnd + 10 * 1000);
+  assert.ok(warned[0].plannedAt instanceof Date);
+});
+
+test("the scheduler warns once per weekly reset", async () => {
+  const warned = [];
+  const { limit, workHours } = scenario();
+  const scheduler = buildScheduler(
+    { notify: async () => {}, notifyWeeklyShift: async (s) => warned.push(s) },
+    limit,
+    workHours,
+  );
 
   await scheduler._scheduleNext();
   await scheduler._scheduleNext();
   clearTimeout(scheduler.timer);
 
   assert.equal(warned.length, 1);
-  assert.ok(warned[0].nextPulseAt instanceof Date);
 });
 
-test("the scheduler stays quiet when the weekly reset does not shift the next pulse", async () => {
+test("the shifted time is held to work hours too", async () => {
+  const { limit, windowEnd } = scenario();
+  const nextMorning = windowEnd + 12 * HOUR_MS;
+  const workHours = {
+    nextAllowed: (t) => (t.getTime() < windowEnd + 60 * 1000 ? new Date(nextMorning) : t),
+  };
+  const scheduler = buildScheduler({ notify: async () => {} }, limit, workHours);
+
+  await scheduler._scheduleNext();
+  clearTimeout(scheduler.timer);
+
+  assert.equal(scheduler.lastScheduledTime.getTime(), nextMorning);
+});
+
+test("the scheduler leaves the pulse alone when the weekly reset does not reach it", async () => {
   const warned = [];
-  const limit = shiftingLimit();
+  const { limit, workHours } = scenario();
   limit.weekly.resetsAt = new Date(Date.now() + 40 * HOUR_MS);
   const scheduler = buildScheduler(
     { notify: async () => {}, notifyWeeklyShift: async (s) => warned.push(s) },
     limit,
+    workHours,
   );
 
   await scheduler._scheduleNext();
   clearTimeout(scheduler.timer);
 
   assert.equal(warned.length, 0);
+  // Held by work hours to 4 hours from now, not moved past the weekly window
+  const wait = scheduler.lastScheduledTime.getTime() - Date.now();
+  assert.ok(Math.abs(wait - 4 * HOUR_MS) < 5000);
 });
 
 test("a window notifier without the heads-up method does not break scheduling", async () => {
-  const scheduler = buildScheduler({ notify: async () => {} }, shiftingLimit());
+  const { limit, workHours } = scenario();
+  const scheduler = buildScheduler({ notify: async () => {} }, limit, workHours);
 
   await assert.doesNotReject(scheduler._scheduleNext());
   clearTimeout(scheduler.timer);

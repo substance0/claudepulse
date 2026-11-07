@@ -43,18 +43,19 @@ export function nextPulseFromRateLimit(rateLimit, now) {
 const WINDOW_MS = 5 * 60 * 60 * 1000;
 
 /**
- * Whether the weekly limit's reset is expected to open a window that the next
- * pulse would find already running, which moves the next window to that
- * window's end. A window opened at the weekly reset is an observed pattern,
- * not documented behaviour, so callers present this as an expectation.
+ * Whether the weekly limit's reset opens a window that the planned pulse would
+ * find already running. The pulse then opens nothing, so it moves to just
+ * after that window ends. The account is observed to start a window at the
+ * weekly reset; the behaviour is not documented.
  *
  * Only a reset after the current window ends can open one: a window already
  * open at the reset is left alone.
  * @param {?{fiveHourResetsAt: ?Date, weekly: ?{resetsAt: ?Date}}} rateLimit
- * @param {Date} nextPulseAt - When the next pulse is planned
- * @returns {?{weeklyResetAt: Date, windowEnd: Date}} Null when the next pulse is unaffected
+ * @param {Date} plannedAt - When the next pulse is planned
+ * @returns {?{weeklyResetAt: Date, windowEnd: Date, nextPulseAt: Date}} The
+ *   shifted pulse time, or null when the planned pulse is unaffected
  */
-export function weeklyResetShift(rateLimit, nextPulseAt) {
+export function weeklyResetShift(rateLimit, plannedAt) {
   const weeklyResetAt = rateLimit?.weekly?.resetsAt;
   const windowEnd = rateLimit?.fiveHourResetsAt;
   if (!(weeklyResetAt instanceof Date) || !(windowEnd instanceof Date)) {
@@ -63,15 +64,17 @@ export function weeklyResetShift(rateLimit, nextPulseAt) {
 
   const opensWindow = weeklyResetAt.getTime() >= windowEnd.getTime();
   const pulseInside =
-    weeklyResetAt.getTime() <= nextPulseAt.getTime() &&
-    nextPulseAt.getTime() < weeklyResetAt.getTime() + WINDOW_MS;
+    weeklyResetAt.getTime() <= plannedAt.getTime() &&
+    plannedAt.getTime() < weeklyResetAt.getTime() + WINDOW_MS;
   if (!opensWindow || !pulseInside) {
     return null;
   }
 
+  const openedUntil = new Date(weeklyResetAt.getTime() + WINDOW_MS);
   return {
     weeklyResetAt,
-    windowEnd: new Date(weeklyResetAt.getTime() + WINDOW_MS),
+    windowEnd: openedUntil,
+    nextPulseAt: new Date(openedUntil.getTime() + WINDOW_RESET_BUFFER_MS),
   };
 }
 

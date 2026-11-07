@@ -3,7 +3,10 @@ import {
   SchedulingStrategyManager,
   weeklyResetShift,
 } from "../strategy/scheduling-strategies.js";
-import { blockingLimit } from "../../../core/services/windowNotification.js";
+import {
+  blockingLimit,
+  windowStartedBefore,
+} from "../../../core/services/windowNotification.js";
 
 /**
  * Claude Session Automation Scheduler
@@ -321,7 +324,7 @@ export class PulseScheduler {
    * @param {Object} pulseResult - Result from _sendPulse()
    * @returns {Object} The same result, with `limitReached` set
    */
-  _processPulseResult(pulseResult) {
+  _processPulseResult(pulseResult, { scheduled = false } = {}) {
     // Keep the last reported window until a pulse reports a new one. A
     // transient failure mid-window does not change when the window resets,
     // and a reset that has passed is ignored when scheduling.
@@ -333,6 +336,22 @@ export class PulseScheduler {
     if (pulseResult.success) {
       this.consecutiveFailures = 0;
       this.lastSuccessTime = new Date();
+    }
+
+    // A scheduled pulse is meant to open the window; the notifier needs to
+    // know it, and when it ran, to tell whether it did.
+    const sentAt = new Date();
+    if (scheduled) {
+      pulseResult = { ...pulseResult, scheduled: true, sentAt };
+      const started = pulseResult.success
+        ? windowStartedBefore(pulseResult.rateLimit, sentAt)
+        : null;
+      if (started) {
+        this.logger.warn(
+          "pulse",
+          `The pulse opened no window: one started at ${DateUtility.formatLocalIso(started)}, opened by something else on the account`,
+        );
+      }
     }
 
     this._notify(pulseResult);
@@ -510,20 +529,19 @@ export class PulseScheduler {
   }
 
   /**
-   * Tell the user ahead of time when the weekly limit's reset is expected to
-   * open a window that the next pulse would land in, once per weekly reset.
-   * @param {Date} nextPulseAt - When the next pulse is planned
+   * Tell the user ahead of time that the weekly limit's reset opens a window
+   * the planned pulse would land in, once per weekly reset.
+   * @param {{weeklyResetAt: Date, windowEnd: Date, plannedAt: Date, nextPulseAt: Date}} shift
    */
-  _warnWeeklyShift(nextPulseAt) {
-    const shift = weeklyResetShift(this.rateLimit, nextPulseAt);
-    if (!shift || this.warnedWeeklyReset === shift.weeklyResetAt.getTime()) {
+  _warnWeeklyShift(shift) {
+    if (this.warnedWeeklyReset === shift.weeklyResetAt.getTime()) {
       return;
     }
     this.warnedWeeklyReset = shift.weeklyResetAt.getTime();
 
     this.logger.warn(
       "schedule",
-      `Weekly reset at ${DateUtility.formatLocalIso(shift.weeklyResetAt)} is expected to open a window ending ${DateUtility.formatLocalIso(shift.windowEnd)}; the pulse planned for ${DateUtility.formatLocalIso(nextPulseAt)} would find it running`,
+      `Weekly reset at ${DateUtility.formatLocalIso(shift.weeklyResetAt)} opens a window ending ${DateUtility.formatLocalIso(shift.windowEnd)}: the pulse planned for ${DateUtility.formatLocalIso(shift.plannedAt)} moves to ${DateUtility.formatLocalIso(shift.nextPulseAt)}`,
     );
 
     const notifier = this.notifier;
@@ -531,7 +549,7 @@ export class PulseScheduler {
       return;
     }
     Promise.resolve()
-      .then(() => notifier.notifyWeeklyShift({ ...shift, nextPulseAt }))
+      .then(() => notifier.notifyWeeklyShift(shift))
       .catch((error) => {
         this.logger.warn("notify", "Weekly shift notification failed", {
           error: error.message,
@@ -610,7 +628,9 @@ export class PulseScheduler {
         return;
       }
 
-      const result = this._processPulseResult(await this._sendPulse());
+      const result = this._processPulseResult(await this._sendPulse(), {
+        scheduled: true,
+      });
 
       if (result.success) {
         this.logger.info("cycle", "Pulse cycle completed successfully");
@@ -712,8 +732,20 @@ export class PulseScheduler {
         strategy = "work_hours";
       }
     }
+    // The weekly reset opens a window of its own. A pulse that would land in
+    // it opens nothing, so it waits for the window to end, still inside
+    // working hours.
+    const shift = weeklyResetShift(this.rateLimit, finalTime);
+    if (shift) {
+      const plannedAt = finalTime;
+      finalTime = shift.nextPulseAt;
+      strategy = "weekly_reset";
+      if (this.workHours) {
+        finalTime = this.workHours.nextAllowed(finalTime);
+      }
+      this._warnWeeklyShift({ ...shift, plannedAt, nextPulseAt: finalTime });
+    }
     this.lastScheduledTime = finalTime;
-    this._warnWeeklyShift(finalTime);
     await this._saveState(finalTime, basis);
 
     // Log scheduling result

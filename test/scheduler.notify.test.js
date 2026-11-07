@@ -70,3 +70,26 @@ test("a failing window notifier does not fail the pulse", async () => {
 
   assert.equal(scheduler.consecutiveFailures, 0);
 });
+
+test("a scheduled pulse is marked as one, with when it was sent", async () => {
+  const notified = [];
+  const scheduler = buildScheduler(ALLOWED, {
+    notify: async (result) => notified.push(result),
+  });
+
+  await scheduler._executePulseCycle();
+
+  assert.equal(notified[0].scheduled, true);
+  assert.ok(notified[0].sentAt instanceof Date);
+});
+
+test("the startup pulse is not marked as scheduled", async () => {
+  const notified = [];
+  const scheduler = buildScheduler(ALLOWED, {
+    notify: async (result) => notified.push(result),
+  });
+
+  await scheduler._sendInitialPulse();
+
+  assert.notEqual(notified[0].scheduled, true);
+});

@@ -404,3 +404,49 @@ test("the alerter stays silent for ordinary pulses and limit messages", async ()
 
   assert.deepEqual(sent, []);
 });
+
+const HOUR_MS = 60 * 60 * 1000;
+
+// A pulse at 07:30 whose window resets at 09:00 was not the one to open it:
+// a window starts 5 hours before it resets.
+function scheduledPulse(sentAt, windowEnd) {
+  return {
+    success: true,
+    scheduled: true,
+    sentAt,
+    rateLimit: {
+      status: "allowed",
+      resetsAt: windowEnd,
+      fiveHourResetsAt: windowEnd,
+    },
+  };
+}
+
+test("a scheduled pulse that found a window already running says it did not open it", () => {
+  const windowEnd = new Date("2026-11-03T08:00:00.000Z");
+  const sentAt = new Date(windowEnd.getTime() - 1.5 * HOUR_MS);
+  const payload = buildWindowNotification(scheduledPulse(sentAt, windowEnd));
+  const started = (windowEnd.getTime() - 5 * HOUR_MS) / 1000;
+
+  assert.equal(payload.level, "WARN");
+  assert.match(payload.title, /already open/i);
+  assert.match(payload.description, new RegExp(`<t:${started}:t>`));
+  assert.match(payload.description, new RegExp(`<t:${windowEnd.getTime() / 1000}:t>`));
+});
+
+test("a scheduled pulse that opened its window announces it as usual", () => {
+  const windowEnd = new Date("2026-11-03T13:00:10.000Z");
+  const sentAt = new Date(windowEnd.getTime() - 5 * HOUR_MS + 13 * 1000);
+  const payload = buildWindowNotification(scheduledPulse(sentAt, windowEnd));
+
+  assert.equal(payload.title, "Window open");
+  assert.equal(payload.level, "SUCCESS");
+});
+
+test("a startup pulse that finds a running window announces it as usual", () => {
+  const windowEnd = new Date("2026-11-03T08:00:00.000Z");
+  const pulse = scheduledPulse(new Date(windowEnd.getTime() - 1.5 * HOUR_MS), windowEnd);
+  delete pulse.scheduled;
+
+  assert.equal(buildWindowNotification(pulse).title, "Window open");
+});

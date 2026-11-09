@@ -195,24 +195,6 @@ export function buildWindowNotification(pulseResult) {
   };
 }
 
-/**
- * Build the Discord payload warning that the weekly limit's reset opens a
- * window ahead of the planned pulse, so the pulse moves to the window's end.
- * Times are absolute: the message is read well before the reset.
- * @param {{weeklyResetAt: Date, windowEnd: Date, plannedAt: Date, nextPulseAt: Date}} shift
- * @returns {{title: string, description: string, level: string}}
- */
-export function buildWeeklyShiftNotification(shift) {
-  const epoch = (date) => Math.floor(date.getTime() / 1000);
-  return {
-    title: "Next window will shift",
-    description:
-      `The weekly limit resets <t:${epoch(shift.weeklyResetAt)}:f> and starts a window that ends at <t:${epoch(shift.windowEnd)}:t>. ` +
-      `The pulse planned for <t:${epoch(shift.plannedAt)}:t> would find it already running, so it moves to <t:${epoch(shift.nextPulseAt)}:t> and the next window opens then.`,
-    level: "WARN",
-  };
-}
-
 /** How long before a pulse a window may start and still count as its own. */
 const OPENED_BY_PULSE_TOLERANCE_MS = 10 * 60 * 1000;
 
@@ -271,12 +253,10 @@ function createNotifier(
  * Create a notifier that posts window announcements to one webhook.
  * @param {string} webhookUrl - Discord webhook for window announcements
  * @param {{send?: Function, label?: string}} [options]
- * @returns {{notify: (pulseResult: Object) => Promise<void>, notifyWeeklyShift: (shift: Object) => Promise<void>}}
+ * @returns {{notify: (pulseResult: Object) => Promise<void>}}
  */
 export function createWindowNotifier(webhookUrl, options) {
-  const window = createNotifier(buildWindowNotification, webhookUrl, options);
-  const shift = createNotifier(buildWeeklyShiftNotification, webhookUrl, options);
-  return { notify: window.notify, notifyWeeklyShift: shift.notify };
+  return createNotifier(buildWindowNotification, webhookUrl, options);
 }
 
 /**

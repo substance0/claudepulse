@@ -1,8 +1,5 @@
 import { DateUtility } from "../../../core/utils/DateUtility.js";
-import {
-  SchedulingStrategyManager,
-  weeklyResetShift,
-} from "../strategy/scheduling-strategies.js";
+import { SchedulingStrategyManager } from "../strategy/scheduling-strategies.js";
 import {
   blockingLimit,
   windowStartedBefore,
@@ -163,9 +160,6 @@ export class PulseScheduler {
     this.fixedIntervalMs = 5 * 60 * 60 * 1000; // 5 hours
     // Latest rate-limit state reported by a pulse; drives scheduling
     this.rateLimit = null;
-    // Weekly reset (epoch ms) already warned about, so a reschedule does not
-    // repeat the heads-up. Kept in memory only: a restart warns again.
-    this.warnedWeeklyReset = null;
     // Names of unknown rate-limit field sets already logged
     this.reportedFieldSets = new Set();
 
@@ -529,35 +523,6 @@ export class PulseScheduler {
   }
 
   /**
-   * Tell the user ahead of time that the weekly limit's reset opens a window
-   * the planned pulse would land in, once per weekly reset and process.
-   * @param {{weeklyResetAt: Date, windowEnd: Date, plannedAt: Date, nextPulseAt: Date}} shift
-   */
-  _warnWeeklyShift(shift) {
-    if (this.warnedWeeklyReset === shift.weeklyResetAt.getTime()) {
-      return;
-    }
-    this.warnedWeeklyReset = shift.weeklyResetAt.getTime();
-
-    this.logger.warn(
-      "schedule",
-      `Weekly reset at ${DateUtility.formatLocalIso(shift.weeklyResetAt)} opens a window ending ${DateUtility.formatLocalIso(shift.windowEnd)}: the pulse planned for ${DateUtility.formatLocalIso(shift.plannedAt)} moves to ${DateUtility.formatLocalIso(shift.nextPulseAt)}`,
-    );
-
-    const notifier = this.notifier;
-    if (typeof notifier?.notifyWeeklyShift !== "function") {
-      return;
-    }
-    Promise.resolve()
-      .then(() => notifier.notifyWeeklyShift(shift))
-      .catch((error) => {
-        this.logger.warn("notify", "Weekly shift notification failed", {
-          error: error.message,
-        });
-      });
-  }
-
-  /**
    * Count a failed cycle and report it. Counting cycles rather than attempts
    * keeps the count on the alert schedule: counting three attempts per cycle
    * gave 3, 6, 9... which never reaches a power of two, so a sustained
@@ -731,31 +696,6 @@ export class PulseScheduler {
         finalTime = allowed;
         strategy = "work_hours";
       }
-    }
-    // The weekly reset opens a window of its own. A pulse that would land in
-    // it opens nothing, so it waits for the window to end, still inside
-    // working hours.
-    // A pulse refused at the weekly limit and planned at that reset confirms
-    // the new window, so it is not shifted. Work hours that moved it later
-    // put it inside the window, so it is shifted like any other pulse.
-    const weeklyResetAt = this.rateLimit?.weekly?.resetsAt;
-    const targetsWeeklyReset =
-      strategy !== "work_hours" &&
-      this.rateLimit?.status === "rejected" &&
-      weeklyResetAt instanceof Date &&
-      this.rateLimit.resetsAt instanceof Date &&
-      this.rateLimit.resetsAt.getTime() === weeklyResetAt.getTime();
-    const shift = targetsWeeklyReset
-      ? null
-      : weeklyResetShift(this.rateLimit, finalTime);
-    if (shift) {
-      const plannedAt = finalTime;
-      finalTime = shift.nextPulseAt;
-      strategy = "weekly_reset";
-      if (this.workHours) {
-        finalTime = this.workHours.nextAllowed(finalTime);
-      }
-      this._warnWeeklyShift({ ...shift, plannedAt, nextPulseAt: finalTime });
     }
     this.lastScheduledTime = finalTime;
     await this._saveState(finalTime, basis);

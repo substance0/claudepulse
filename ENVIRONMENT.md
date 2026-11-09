@@ -518,24 +518,6 @@ reset time is visible from a phone.
   limit lifts. Pulsing resumes on its own at that time. If the pulse instead
   ran on paid extra usage, it posts "Extra usage in use" in their place.
 - "Window open" also shows weekly usage and when the weekly window resets.
-- The weekly limit's reset starts a window of its own. When it falls after
-  the current window ends and the next planned pulse lands inside the window
-  it opens (within 5 hours), that pulse would open nothing. It moves to 10
-  seconds after the weekly window ends, still inside working hours, and the
-  log names the strategy `weekly_reset`. A "Next window will shift" message
-  is posted right away, once per weekly reset and per process (a restart can
-  repeat it), with the weekly reset, the
-  end of the window it opens, the pulse it displaces and the new pulse time,
-  as absolute times, so you can plan your day. A pulse that was refused at
-  the weekly limit already targets the weekly reset and opens that window, so
-  it stays there, with no shift and no message. If work hours moved it later,
-  into the window it opened, it is shifted like any other pulse. The window at
-  the weekly reset
-  is an observation, not documented behaviour; the shift needs
-  `weekly.resetsAt` in the pulse's response and follows from it. A pulse
-  refused at the weekly limit and planned at that reset stays there, with no
-  shift and no message, because the refusal already confirms the new window;
-  a pulse that work hours moved later is still shifted.
 - A scheduled pulse that finds a window that started more than 10 minutes
   before it (a window starts 5 hours before it resets) opened nothing:
   something else on the account did. The notification is then "Window
@@ -742,11 +724,8 @@ ClaudePulse uses priority-based scheduling:
 `window_reset` uses the 5-hour reset after an allowed pulse, and the blocking
 window's reset after a pulse refused at the usage limit.
 
-Two adjustments then apply to the chosen time, and the log names them as the
-strategy: `work_hours` moves a time outside working hours to the next working
-moment, and `weekly_reset` moves a time that lands inside the window the
-weekly limit's reset opens to 10 seconds after that window ends (see
-[`DISCORD_WINDOW_WEBHOOK_URL`](#discord_window_webhook_url)).
+With work hours on, the chosen time then moves to the next moment inside
+working hours, and the log names the strategy `work_hours`.
 
 **All schedules include a 10-second buffer** to ensure pulses occur after time boundaries.
 

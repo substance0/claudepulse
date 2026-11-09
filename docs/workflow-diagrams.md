@@ -135,14 +135,6 @@ Strategies are evaluated in priority order. The first applicable strategy determ
 - **`discovery`** is a fallback: a single successful pulse is enough to leave it
 - All strategies include a 10-second buffer so the pulse lands in the new window rather than racing its boundary
 - With work hours on (`WORK_HOURS_ENABLED=true`), the chosen time then moves to the next moment inside working hours, usually the next working day's first pulse; the log then names the strategy `work_hours`
-- The weekly limit's reset starts a window of its own. When that reset falls after the current window ends and the chosen pulse time lands inside the window it opens, the pulse would open nothing, so it moves to 10 seconds after that window ends (still held to working hours) and the log names the strategy `weekly_reset`. With a webhook for window notifications, a "Next window will shift" message announces it ahead of time. This is not a separate strategy in the table: like `work_hours`, it adjusts the time a strategy chose
-
-```text
-22:30 pulse   window ends 03:30, weekly limit resets 04:00 (reported by the pulse)
-              work hours move the next pulse to 07:30
-04:00         the weekly reset opens a window that ends 09:00
-07:30         would find it running -> moved to 09:00:10 (strategy weekly_reset)
-```
 
 ```mermaid
 graph TD

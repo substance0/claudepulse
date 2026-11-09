@@ -39,45 +39,6 @@ export function nextPulseFromRateLimit(rateLimit, now) {
   return new Date(reset.getTime() + WINDOW_RESET_BUFFER_MS);
 }
 
-/** Length of a usage window. */
-const WINDOW_MS = 5 * 60 * 60 * 1000;
-
-/**
- * Whether the weekly limit's reset opens a window that the planned pulse would
- * find already running. The pulse then opens nothing, so it moves to just
- * after that window ends. The account is observed to start a window at the
- * weekly reset; the behaviour is not documented.
- *
- * Only a reset after the current window ends can open one: a window already
- * open at the reset is left alone.
- * @param {?{fiveHourResetsAt: ?Date, weekly: ?{resetsAt: ?Date}}} rateLimit
- * @param {Date} plannedAt - When the next pulse is planned
- * @returns {?{weeklyResetAt: Date, windowEnd: Date, nextPulseAt: Date}} The
- *   shifted pulse time, or null when the planned pulse is unaffected
- */
-export function weeklyResetShift(rateLimit, plannedAt) {
-  const weeklyResetAt = rateLimit?.weekly?.resetsAt;
-  const windowEnd = rateLimit?.fiveHourResetsAt;
-  if (!(weeklyResetAt instanceof Date) || !(windowEnd instanceof Date)) {
-    return null;
-  }
-
-  const opensWindow = weeklyResetAt.getTime() >= windowEnd.getTime();
-  const pulseInside =
-    weeklyResetAt.getTime() <= plannedAt.getTime() &&
-    plannedAt.getTime() < weeklyResetAt.getTime() + WINDOW_MS;
-  if (!opensWindow || !pulseInside) {
-    return null;
-  }
-
-  const openedUntil = new Date(weeklyResetAt.getTime() + WINDOW_MS);
-  return {
-    weeklyResetAt,
-    windowEnd: openedUntil,
-    nextPulseAt: new Date(openedUntil.getTime() + WINDOW_RESET_BUFFER_MS),
-  };
-}
-
 /**
  * Base class for scheduling strategies
  */

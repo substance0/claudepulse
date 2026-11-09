@@ -1,3 +1,10 @@
+## [2.9.2](https://github.com/substance0/claudepulse/compare/v2.9.1...v2.9.2) (2026-11-09)
+
+
+### Bug Fixes
+
+* stop moving a pulse because of the weekly reset ([#36](https://github.com/substance0/claudepulse/issues/36)) ([5905b5a](https://github.com/substance0/claudepulse/commit/5905b5ab8cdb36fd41dde47c220c26d2f10b068c))
+
 ## [2.9.1](https://github.com/substance0/claudepulse/compare/v2.9.0...v2.9.1) (2026-11-07)
 
 
